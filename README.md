@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">"
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ArchFlow — User Guide</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -61,7 +61,7 @@ kbd{display:inline-block;background:var(--bg);border:1px solid var(--bd2);border
 .type-table th{text-align:left;padding:8px 10px;background:var(--bg);border-bottom:2px solid var(--bd);font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase}
 .type-table td{padding:8px 10px;border-bottom:1px solid var(--bd);vertical-align:middle}
 .type-table tr:last-child td{border-bottom:none}
-@media(max-width:600px){.two-col{grid-template-columns:1fr}.toc ol{grid-template-columns:1fr}}"
+@media(max-width:600px){.two-col{grid-template-columns:1fr}.toc ol{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
