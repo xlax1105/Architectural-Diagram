@@ -1,0 +1,3576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArchFlow</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0eff0;--surface:#fff;--s2:#f7f6f7;--s3:#f0eff0;
+  --bd:#e0dfe0;--bd2:#c8c7c8;--bd3:#aaa;
+  --tx:#1a191a;--tx2:#5a595a;--tx3:#8a898a;
+  --ac:#5B4CF5;--ac-l:#ede9fe;
+  --red:#dc2626;--red-l:#fee2e2;--grn:#16a34a;
+  --sh:0 2px 8px rgba(0,0,0,.10),0 0 0 1px rgba(0,0,0,.06);
+  --sh-sel:0 8px 32px rgba(0,0,0,.18),0 0 0 2px var(--ac);
+  --r:10px;--tbh:54px;--pw:264px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+
+/* ── toolbar ── */
+#toolbar{height:var(--tbh);background:var(--surface);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:6px;padding:0 14px;flex-shrink:0;z-index:100;overflow-x:auto}
+#toolbar h1{font-size:14px;font-weight:600;margin-right:6px;white-space:nowrap}
+.tbsep{width:1px;height:22px;background:var(--bd);margin:0 2px;flex-shrink:0}
+.tbbtn{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid var(--bd);background:transparent;color:var(--tx);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.tbbtn:hover{background:var(--s2);border-color:var(--bd2)}
+.tbbtn.active{background:var(--ac-l);border-color:var(--ac);color:var(--ac)}
+#mode-label{font-size:11px;color:var(--tx3);margin-left:auto;white-space:nowrap}
+
+/* ── layout ── */
+#layout{display:flex;flex:1;overflow:hidden}
+
+/* ── left panel ── */
+#panel{width:var(--pw);background:var(--surface);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.panel-tab-row{display:flex;border-bottom:1px solid var(--bd);flex-shrink:0}
+.panel-tab{flex:1;padding:9px 2px;font-size:11px;font-weight:500;text-align:center;cursor:pointer;color:var(--tx3);border-bottom:2px solid transparent;transition:color .12s;white-space:nowrap}
+.panel-tab.active{color:var(--ac);border-bottom-color:var(--ac)}
+#panel-list{flex:1;overflow-y:auto}
+.ph{padding:10px 14px 6px;font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
+.ph-add{font-size:16px;color:var(--ac);cursor:pointer;line-height:1;padding:0 2px}
+.ph-add:hover{opacity:.7}
+.nt-row{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:grab;border-bottom:1px solid var(--bd);font-size:13px;color:var(--tx);transition:background .1s}
+.nt-row:hover{background:var(--s2)}
+.nt-row:active{cursor:grabbing}
+.nt-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+.nt-label{font-size:12px;font-weight:500;flex:1}
+.nt-sub{font-size:10px;color:var(--tx3)}
+.nt-edit{font-size:12px;color:var(--tx3);cursor:pointer;padding:2px 4px;border-radius:4px;line-height:1}
+.nt-edit:hover{background:var(--s2);color:var(--tx)}
+
+/* shape templates */
+.sh-row{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:grab;border-bottom:1px solid var(--bd);font-size:12px;color:var(--tx);transition:background .1s}
+.sh-row:hover{background:var(--s2)}
+.sh-preview{width:36px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.sh-preview svg{width:100%;height:100%}
+
+/* props */
+#panel-props{flex:1;overflow-y:auto;padding:14px;display:none}
+#panel-props.visible{display:block}
+.pg{margin-bottom:14px}
+.pl{font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px}
+.pi,.ps,.pta{width:100%;padding:6px 9px;border:1px solid var(--bd);border-radius:7px;font-size:12px;color:var(--tx);background:var(--surface);outline:none;transition:border-color .12s;font-family:inherit}
+.pi:focus,.ps:focus,.pta:focus{border-color:var(--ac)}
+.pta{resize:vertical;min-height:52px}
+.cr{display:flex;gap:5px;flex-wrap:wrap}
+.csw{width:22px;height:22px;border-radius:5px;cursor:pointer;border:2px solid transparent;transition:border-color .1s,transform .1s}
+.csw:hover{transform:scale(1.15)}
+.csw.sel{border-color:var(--tx)}
+.dbtn{width:100%;padding:7px;border-radius:7px;border:1px solid var(--red-l);background:var(--red-l);color:var(--red);font-size:12px;font-weight:500;cursor:pointer}
+.dbtn:hover{background:#fecaca}
+.sbtn{width:100%;padding:7px;border-radius:7px;border:1px solid var(--bd);background:var(--s2);color:var(--tx2);font-size:12px;cursor:pointer;margin-bottom:6px}
+.sbtn:hover{background:var(--s3)}
+
+/* ── canvas ── */
+#canvas-wrap{flex:1;position:relative;overflow:hidden;background-color:#e8e7e8;cursor:grab}
+#canvas-bg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+#svg-layer{position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:1}
+#edges-layer{pointer-events:none}
+#edges-layer path.hit-path{pointer-events:all}
+#canvas{position:absolute;top:0;left:0;transform-origin:0 0;width:4000px;height:4000px;z-index:2;pointer-events:none}
+#draw-layer{position:absolute;top:0;left:0;width:4000px;height:4000px;pointer-events:none;z-index:3;transform-origin:0 0}
+#draw-layer.drawing{pointer-events:all;cursor:crosshair}
+#connect-overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:none;cursor:crosshair;z-index:5}
+#connect-overlay.active{display:block}
+/* rubber-band selection rect */
+#sel-rect{position:absolute;border:1.5px dashed var(--ac);background:rgba(91,76,245,.07);border-radius:3px;pointer-events:none;display:none;z-index:50}
+
+/* ── nodes ── */
+.node{position:absolute;background:var(--surface);border-radius:var(--r);box-shadow:var(--sh);min-width:150px;cursor:move;border:2px solid transparent;z-index:1;pointer-events:all}
+.node.selected{box-shadow:var(--sh-sel);border-color:var(--ac)}
+.node.multi-sel{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac),0 2px 8px rgba(0,0,0,.1)}
+.node.connect-target{border-color:var(--grn);box-shadow:0 0 0 3px rgba(22,163,74,.2)}
+.nh{padding:9px 11px 7px;border-radius:calc(var(--r) - 2px) calc(var(--r) - 2px) 0 0;display:flex;align-items:center;gap:7px}
+.ni{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px}
+.ntitle{font-size:12px;font-weight:600;flex:1;min-width:0;word-break:break-word}
+.ntitle.editing{outline:none;background:rgba(255,255,255,.85);border-radius:4px;padding:1px 4px;margin:-1px -4px;cursor:text;caret-color:var(--ac)}
+.nsub{font-size:10px;color:var(--tx3);padding:0 11px 7px;line-height:1.4}
+.nfooter{display:flex;align-items:center;justify-content:space-between;padding:0 9px 7px}
+.node-meta{padding:0 11px 6px;font-size:9px;color:var(--tx3);line-height:1.7;display:none}
+.node:hover .node-meta,.node.selected .node-meta,.node.multi-sel .node-meta{display:block}
+.port{width:11px;height:11px;border-radius:50%;background:var(--bd2);border:2px solid var(--surface);cursor:crosshair;transition:background .1s,transform .1s;flex-shrink:0}
+.port:hover{background:var(--ac);transform:scale(1.4)}
+.ibtn{width:18px;height:18px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--tx3);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.ibtn:hover{background:var(--ac-l);color:var(--ac);border-color:var(--ac)}
+
+/* ── resize handles ── */
+.resize-handle{position:absolute;width:10px;height:10px;background:var(--surface);border:2px solid var(--ac);border-radius:2px;z-index:20;box-sizing:border-box}
+.resize-handle.nw{top:-5px;left:-5px;cursor:nw-resize}
+.resize-handle.ne{top:-5px;right:-5px;cursor:ne-resize}
+.resize-handle.se{bottom:-5px;right:-5px;cursor:se-resize}
+.resize-handle.sw{bottom:-5px;left:-5px;cursor:sw-resize}
+
+/* ── canvas shapes ── */
+.cshape{position:absolute;cursor:move;z-index:1;pointer-events:all}
+.cshape.selected .shape-sel-ring{outline:2px solid var(--ac);outline-offset:2px;border-radius:3px}
+.cshape svg{display:block}
+.cshape-del{position:absolute;top:-10px;right:-10px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:11px;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;line-height:1}
+.cshape.selected .cshape-del{display:flex}
+.ctextblock{position:absolute;cursor:move;z-index:1;min-width:80px;min-height:24px}
+.ctextblock.selected{outline:2px solid var(--ac);outline-offset:3px;border-radius:3px}
+.ctextblock-inner{font-size:14px;color:var(--tx);padding:4px 6px;white-space:pre-wrap;word-break:break-word;min-width:80px;min-height:24px;border-radius:3px;cursor:move;user-select:none}
+.ctextblock-inner.editing{cursor:text;user-select:text;outline:none;background:rgba(255,255,255,.85)}
+.ctextblock-del{position:absolute;top:-10px;right:-10px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:11px;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;line-height:1}
+.ctextblock.selected .ctextblock-del{display:flex}
+
+/* ── edge labels ── */
+.el-wrap{position:absolute;pointer-events:all;cursor:pointer;transform:translate(-50%,-50%)}
+.el-pill{background:var(--surface);border:1px solid var(--bd2);border-radius:6px;padding:2px 7px;font-size:10px;color:var(--tx2);white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.08);max-width:150px;overflow:hidden;text-overflow:ellipsis;opacity:0.35;transition:opacity .1s}
+.el-pill:hover{border-color:var(--ac);color:var(--ac);opacity:1}
+.el-pill.sel{border-color:var(--ac);color:var(--ac);background:var(--ac-l);opacity:1}
+/* floating pill that appears on top of everything on hover */
+#edge-pill-hover{position:fixed;z-index:2000;pointer-events:none;display:none;background:var(--surface);border:1.5px solid var(--ac);border-radius:6px;padding:3px 9px;font-size:11px;color:var(--ac);white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.15);transform:translate(-50%,-120%);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+
+/* ── modals ── */
+.mbdrop{position:fixed;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(2px)}
+.modal{background:var(--surface);border-radius:14px;padding:22px;width:420px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h2{font-size:15px;font-weight:600;margin-bottom:14px}
+.mact{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+.btn-p{padding:7px 14px;border-radius:8px;border:none;background:var(--ac);color:#fff;font-size:12px;font-weight:500;cursor:pointer}
+.btn-p:hover{opacity:.88}
+.btn-g{padding:7px 14px;border-radius:8px;border:1px solid var(--bd);background:transparent;color:var(--tx2);font-size:12px;cursor:pointer}
+.btn-g:hover{background:var(--s2)}
+.btn-d{padding:7px 14px;border-radius:8px;border:1px solid var(--red-l);background:var(--red-l);color:var(--red);font-size:12px;cursor:pointer}
+.btn-d:hover{background:#fecaca}
+
+/* ── type editor modal ── */
+.type-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}
+.type-row:last-child{border-bottom:none}
+.type-icon-prev{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.type-name-col{flex:1;font-size:13px;font-weight:500}
+.type-sub-col{font-size:11px;color:var(--tx3)}
+.type-actions{display:flex;gap:4px}
+.type-act-btn{font-size:11px;padding:3px 8px;border-radius:5px;border:1px solid var(--bd);background:transparent;color:var(--tx2);cursor:pointer}
+.type-act-btn:hover{background:var(--s2)}
+.icon-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.icon-opt{width:30px;height:30px;border-radius:6px;border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;transition:border-color .1s}
+.icon-opt:hover,.icon-opt.sel{border-color:var(--ac);background:var(--ac-l)}
+
+/* ── conn popup (per-node) ── */
+#conn-popup{position:fixed;z-index:900;background:var(--surface);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.18);width:340px;display:none;max-height:82vh;overflow:hidden;flex-direction:column}
+#conn-popup.visible{display:flex}
+/* popup header */
+.cph{padding:12px 14px 10px;border-bottom:1px solid var(--bd);flex-shrink:0;position:relative}
+.cpt{font-size:13px;font-weight:600}
+.cpst{font-size:10px;color:var(--tx3);margin-top:2px}
+.cp-attrs{padding:7px 14px;border-bottom:1px solid var(--bd);display:flex;gap:14px;flex-wrap:wrap;flex-shrink:0}
+.cp-attr{font-size:11px}
+.cp-attr-label{color:var(--tx3);font-weight:600;text-transform:uppercase;font-size:9px;letter-spacing:.06em}
+.cp-attr-val{color:var(--tx);margin-top:1px}
+.cpclose{position:absolute;top:8px;right:8px;width:22px;height:22px;border:none;background:transparent;border-radius:5px;cursor:pointer;font-size:15px;color:var(--tx3);display:flex;align-items:center;justify-content:center}
+.cpclose:hover{background:var(--s2);color:var(--tx)}
+/* view toggle row */
+.cp-toolbar{padding:7px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.cp-vtoggle{display:flex;gap:2px;background:var(--s2);border-radius:6px;padding:2px}
+.cp-vbtn{padding:3px 10px;border-radius:5px;font-size:11px;border:none;background:transparent;color:var(--tx3);cursor:pointer;white-space:nowrap}
+.cp-vbtn.active{background:var(--surface);color:var(--tx);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+/* filter chips */
+.cp-filters{padding:7px 14px;border-bottom:1px solid var(--bd);display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.cp-chip{padding:2px 9px;border-radius:20px;font-size:11px;border:1px solid var(--bd);background:transparent;color:var(--tx2);cursor:pointer;white-space:nowrap;transition:all .1s}
+.cp-chip:hover{border-color:var(--bd2);background:var(--s2)}
+.cp-chip.active{background:var(--ac-l);border-color:var(--ac);color:var(--ac);font-weight:600}
+/* scrollable body */
+.cp-scroll{flex:1;overflow-y:auto}
+/* type group */
+.cp-group{border-bottom:1px solid var(--bd)}
+.cp-group-hdr{padding:8px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background .1s;user-select:none}
+.cp-group-hdr:hover{background:var(--s2)}
+.cp-group-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.cp-group-name{font-size:12px;font-weight:600;flex:1}
+.cp-group-cnt{font-size:10px;font-weight:600;padding:1px 6px;border-radius:9px;background:var(--s3);color:var(--tx2)}
+.cp-chev{font-size:10px;color:var(--tx3);transition:transform .15s;flex-shrink:0}
+.cp-chev.open{transform:rotate(90deg)}
+.cp-group-body{display:none}
+.cp-group-body.open{display:block}
+/* edge rows inside group */
+.cp-erow{padding:7px 14px 7px 44px;display:flex;align-items:flex-start;gap:8px;border-top:1px solid var(--bd);cursor:pointer;transition:background .1s}
+.cp-erow:hover{background:var(--s2)}
+.cp-earr{font-size:12px;flex-shrink:0;margin-top:1px}
+.cp-ename{font-size:12px;font-weight:500;flex:1;min-width:0}
+.cp-emeta{font-size:10px;color:var(--tx3);margin-top:2px;line-height:1.4}
+.cpbadge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:var(--ac-l);color:var(--ac);margin-right:3px}
+/* summary card view */
+.cp-sum-card{padding:9px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:9px;cursor:pointer;transition:background .1s}
+.cp-sum-card:hover{background:var(--s2)}
+.cp-sum-bar-wrap{flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden;margin-top:4px}
+.cp-sum-bar{height:100%;border-radius:3px}
+/* empty */
+.cpempty{padding:14px;font-size:11px;color:var(--tx3);font-style:italic;text-align:center}
+/* ── multi-select dropdown ── */
+.ms-wrap{position:relative}
+.ms-trigger{width:100%;padding:6px 9px;border:1px solid var(--bd);border-radius:7px;font-size:12px;color:var(--tx);background:var(--surface);cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:32px;user-select:none;box-sizing:border-box}
+.ms-trigger:hover{border-color:var(--bd2)}
+.ms-trigger.open{border-color:var(--ac)}
+.ms-trigger-val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-trigger-val.placeholder{color:var(--tx3)}
+.ms-chevron{font-size:9px;color:var(--tx3);transition:transform .15s;flex-shrink:0}
+.ms-chevron.open{transform:rotate(180deg)}
+.ms-dropdown{position:absolute;top:calc(100% + 3px);left:0;right:0;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:3000;overflow:hidden;display:none}
+.ms-dropdown.open{display:block}
+.ms-option{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;cursor:pointer;transition:background .1s;user-select:none}
+.ms-option:hover{background:var(--s2)}
+.ms-option input[type=checkbox]{width:14px;height:14px;accent-color:var(--ac);cursor:pointer;flex-shrink:0}
+.ms-option label{flex:1;cursor:pointer;margin:0}
+
+/* ── view filter bar ── */
+#filter-bar{background:var(--surface);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;padding:0 14px;height:38px;flex-shrink:0;overflow-x:auto}
+.fb-label{font-size:11px;font-weight:600;color:var(--tx3);white-space:nowrap;letter-spacing:.04em}
+.fb-sep{width:1px;height:18px;background:var(--bd);margin:0 4px;flex-shrink:0}
+.fb-chip-wrap{position:relative}
+.fb-trigger{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;border:1px solid var(--bd);background:transparent;color:var(--tx2);font-size:11px;cursor:pointer;white-space:nowrap;transition:all .12s}
+.fb-trigger:hover{border-color:var(--bd2);background:var(--s2)}
+.fb-trigger.active{background:var(--ac-l);border-color:var(--ac);color:var(--ac);font-weight:600}
+.fb-chevron{font-size:8px;color:inherit;transition:transform .15s}
+.fb-chevron.open{transform:rotate(180deg)}
+.fb-dropdown{position:fixed;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:3000;min-width:160px;display:none;overflow:hidden}
+.fb-dropdown.open{display:block}
+.fb-opt{display:flex;align-items:center;gap:8px;padding:7px 12px;font-size:12px;cursor:pointer;transition:background .1s;white-space:nowrap}
+.fb-opt:hover{background:var(--s2)}
+.fb-opt input[type=checkbox]{width:13px;height:13px;accent-color:var(--ac);cursor:pointer;flex-shrink:0}
+.fb-opt label{flex:1;cursor:pointer;margin:0}
+.fb-clear{font-size:11px;color:var(--tx3);cursor:pointer;padding:0 4px;white-space:nowrap}
+.fb-clear:hover{color:var(--red)}
+/* filtered node states */
+.node.flt-hidden{opacity:0;pointer-events:none}
+.node.flt-dim{opacity:0.22;pointer-events:none}
+
+/* ── save menu ── */
+.save-menu-item{padding:9px 14px;font-size:12px;cursor:pointer;transition:background .1s;white-space:nowrap}
+.save-menu-item:hover{background:var(--s2)}
+.save-menu-sep{height:1px;background:var(--bd);margin:3px 0}
+/* ── slots modal ── */
+.slot-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--bd)}
+.slot-row:last-child{border-bottom:none}
+.slot-name{flex:1;min-width:0}
+.slot-name-text{font-size:13px;font-weight:500;cursor:text;border-radius:4px;padding:1px 3px}
+.slot-name-text:hover{background:var(--s2)}
+.slot-meta{font-size:10px;color:var(--tx3);margin-top:1px}
+.slot-act{display:flex;gap:4px}
+.slot-btn{padding:4px 8px;border-radius:5px;border:1px solid var(--bd);background:transparent;color:var(--tx2);font-size:11px;cursor:pointer;white-space:nowrap}
+.slot-btn:hover{background:var(--s2)}
+.slot-btn.primary{background:var(--ac);border-color:var(--ac);color:#fff}
+.slot-btn.primary:hover{opacity:.88}
+.slot-btn.danger{color:var(--red);border-color:var(--red-l)}
+.slot-btn.danger:hover{background:var(--red-l)}
+
+/* ── settings panel ── */
+.proto-item{display:flex;align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid var(--bd);font-size:12px}
+.proto-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proto-item-btn{width:22px;height:22px;border:1px solid var(--bd);border-radius:5px;background:transparent;color:var(--tx3);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.proto-item-btn:hover{background:var(--s2);color:var(--tx)}
+.proto-item-btn.del:hover{background:var(--red-l);color:var(--red);border-color:var(--red-l)}
+.proto-add-row{display:flex;gap:6px;padding:10px 14px;border-top:1px solid var(--bd)}
+.proto-add-row input{flex:1;padding:6px 8px;border:1px solid var(--bd);border-radius:6px;font-size:12px;color:var(--tx);background:var(--surface);outline:none;font-family:inherit}
+.proto-add-row input:focus{border-color:var(--ac)}
+.proto-add-row button{padding:6px 10px;border-radius:6px;border:none;background:var(--ac);color:#fff;font-size:12px;cursor:pointer;white-space:nowrap}
+.proto-add-row button:hover{opacity:.88}
+.settings-section{padding:12px 14px 6px;font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.07em;text-transform:uppercase;border-bottom:1px solid var(--bd)}
+
+/* ── hints / zoom ── */
+#empty-state{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+#empty-state .esi{font-size:44px;margin-bottom:10px;opacity:.3}
+#empty-state p{font-size:13px;color:var(--tx3)}
+#zoom-controls{position:absolute;bottom:14px;right:14px;display:flex;gap:3px;background:var(--surface);border:1px solid var(--bd);border-radius:8px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.zbtn{width:28px;height:28px;border:none;background:transparent;border-radius:5px;cursor:pointer;font-size:15px;color:var(--tx2);display:flex;align-items:center;justify-content:center}
+.zbtn:hover{background:var(--s2)}
+#zlabel{font-size:10px;color:var(--tx3);align-self:center;padding:0 3px;min-width:34px;text-align:center}
+#connect-hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:var(--ac);color:#fff;border-radius:20px;padding:5px 14px;font-size:12px;pointer-events:none;display:none;box-shadow:0 4px 12px rgba(91,76,245,.35);white-space:nowrap}
+</style>
+</head>
+<body>
+
+<datalist id="proto-datalist"></datalist>
+<div id="toolbar">
+  <h1>⬡ ArchFlow</h1>
+  <div class="tbsep"></div>
+  <button class="tbbtn" id="btn-connect" onclick="toggleConnectMode()">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 8h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    Connect
+  </button>
+  <div class="tbsep"></div>
+  <button class="tbbtn" id="btn-draw-rect" onclick="setDrawMode('rect')" title="Draw rectangle">▭ Rect</button>
+  <button class="tbbtn" id="btn-draw-ellipse" onclick="setDrawMode('ellipse')" title="Draw ellipse">◯ Ellipse</button>
+  <button class="tbbtn" id="btn-draw-arrow" onclick="setDrawMode('arrow')" title="Draw arrow">→ Arrow</button>
+  <button class="tbbtn" id="btn-draw-text" onclick="setDrawMode('text')" title="Add text">T Text</button>
+  <div class="tbsep"></div>
+  <button class="tbbtn" onclick="clearAll()">✕ Clear</button>
+  <button class="tbbtn" onclick="exportSVG()">↓ SVG</button>
+  <button class="tbbtn" onclick="loadExample()">⏱ Example</button>
+  <div class="tbsep"></div>
+  <button class="tbbtn" id="btn-snap" onclick="toggleSnap()" title="Snap to grid">⊞ Snap</button>
+  <button class="tbbtn" id="btn-lasso" onclick="toggleLasso()" title="Lasso / rubber-band select">⬚ Lasso</button>
+  <div class="tbsep"></div>
+  <div style="position:relative">
+    <button class="tbbtn" onclick="openSaveMenu(event)" title="Save / Load">💾 Save ▾</button>
+    <div id="save-menu" style="position:fixed;display:none;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:3000;min-width:190px;overflow:hidden">
+      <div class="save-menu-item" onclick="saveToSlot()">💾 Save (auto-slot)</div>
+      <div class="save-menu-item" onclick="openSlotsModal()">📂 Manage saved diagrams</div>
+      <div class="save-menu-sep"></div>
+      <div class="save-menu-item" onclick="spExportAndOpen()">☁ Save to SharePoint folder</div>
+      <div class="save-menu-item" onclick="spOpenFolder()">📂 Open SharePoint folder</div>
+      <div class="save-menu-sep"></div>
+      <div class="save-menu-item" onclick="exportJSON()">⬇ Export as JSON file</div>
+      <div class="save-menu-item" onclick="document.getElementById('import-file-input').click()">⬆ Import from JSON file</div>
+    </div>
+  </div>
+  <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importFromFile(event)">
+<input type="file" id="bulk-import-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="bulkImportFromFile(event)">
+  <span id="mode-label">Select mode</span>
+  <span id="save-toast" style="font-size:11px;color:var(--grn);margin-left:4px;opacity:0;transition:opacity .3s"></span>
+</div>
+
+<div id="edge-pill-hover"></div>
+
+<!-- View filter bar -->
+<div id="filter-bar">
+  <span class="fb-label">Filter:</span>
+  <div class="fb-chip-wrap" id="fb-portfolio-wrap"></div>
+  <div class="fb-sep"></div>
+  <div class="fb-chip-wrap" id="fb-eai-wrap"></div>
+  <div class="fb-sep"></div>
+  <div class="fb-chip-wrap" id="fb-techflags-wrap"></div>
+  <div class="fb-sep"></div>
+  <div class="fb-chip-wrap" id="fb-coe-wrap"></div>
+  <div class="fb-sep"></div>
+  <span class="fb-clear" id="fb-clear-btn" onclick="clearViewFilters()" style="display:none">✕ Clear filters</span>
+</div>
+
+<div id="layout">
+  <div id="panel">
+    <div class="panel-tab-row">
+      <div class="panel-tab active" id="tab-apps" onclick="switchTab('apps')">Apps</div>
+      <div class="panel-tab" id="tab-types" onclick="switchTab('types')">Types</div>
+      <div class="panel-tab" id="tab-props" onclick="switchTab('props')">Props</div>
+      <div class="panel-tab" id="tab-settings" onclick="switchTab('settings')">Settings</div>
+    </div>
+    <div id="panel-list"></div>
+    <div id="panel-props"></div>
+  </div>
+
+  <div id="canvas-wrap">
+    <svg id="canvas-bg" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid-pat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d0ced0" stroke-width="0.75"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid-pat)"/></svg>
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#9ca3af"/></marker>
+        <marker id="ah-sel" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#5B4CF5"/></marker>
+        <marker id="ah-draw" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#374151"/></marker>
+      </defs>
+      <g id="edges-layer"></g>
+    </svg>
+    <div id="canvas">
+      <div id="edge-labels-layer" style="position:absolute;top:0;left:0;pointer-events:none;width:4000px;height:4000px"></div>
+      <div id="shapes-layer" style="position:absolute;top:0;left:0;width:4000px;height:4000px"></div>
+    </div>
+    <div id="sel-rect"></div>
+    <svg id="draw-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="connect-overlay" onclick="onConnectOverlayClick()"></div>
+    <div id="connect-hint"></div>
+    <div id="empty-state"><div class="esi">⬡</div><p>Drag an app type onto the canvas<br>or use the draw tools above</p></div>
+    <div id="zoom-controls">
+      <button class="zbtn" onclick="zoom(-0.15)">−</button>
+      <span id="zlabel">100%</span>
+      <button class="zbtn" onclick="zoom(0.15)">+</button>
+      <button class="zbtn" onclick="resetZoom()" style="font-size:10px">⊙</button>
+    </div>
+  </div>
+</div>
+
+<!-- conn popup (per-node) -->
+<div id="conn-popup">
+  <div class="cph">
+    <div class="cpt" id="cp-title"></div>
+    <div class="cpst" id="cp-subtitle"></div>
+    <div style="position:absolute;top:8px;right:32px;display:flex;gap:4px">
+      <button class="cpclose" style="font-size:11px;width:26px" onclick="exportConnPopupScreenshot()" title="Download as image">📷</button>
+    </div>
+    <button class="cpclose" onclick="closeConnPopup()">×</button>
+  </div>
+  <div id="cp-attrs"></div>
+  <div id="cp-toolbar" class="cp-toolbar" style="display:none">
+    <div class="cp-vtoggle">
+      <button class="cp-vbtn active" id="cp-vbtn-detail" onclick="cpSetView('detail')">Detail</button>
+      <button class="cp-vbtn" id="cp-vbtn-summary" onclick="cpSetView('summary')">Summary</button>
+    </div>
+  </div>
+  <div id="cp-filters" class="cp-filters" style="display:none"></div>
+  <div class="cp-scroll" id="cp-body"></div>
+</div>
+
+<!-- Saved diagrams modal -->
+<div id="slots-modal" class="mbdrop" style="display:none" onclick="if(event.target===this)closeSlotsModal()">
+  <div class="modal" style="width:460px">
+    <h2>Saved diagrams</h2>
+    <div id="slots-list"></div>
+    <div class="mact">
+      <button class="btn-g" onclick="closeSlotsModal()">Close</button>
+      <button class="btn-p" onclick="saveToNewSlot()">+ Save as new</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import choice modal -->
+<div id="import-choice-modal" class="mbdrop" style="display:none" onclick="if(event.target===this)document.getElementById('import-choice-modal').style.display='none'">
+  <div class="modal" style="width:400px">
+    <h2 id="icm-title">Import diagram</h2>
+    <p id="icm-desc" style="font-size:13px;color:var(--tx2);margin-bottom:20px"></p>
+    <div style="display:flex;gap:10px">
+      <button class="btn-g" style="flex:1;padding:14px;border-radius:10px;font-size:13px;text-align:center;cursor:pointer" onclick="icmChoose('replace')">
+        <div style="font-size:22px;margin-bottom:6px">🔄</div>
+        <div style="font-weight:600;margin-bottom:4px">Replace canvas</div>
+        <div style="font-size:11px;color:var(--tx3)">Clear everything and load the imported diagram</div>
+      </button>
+      <button class="btn-g" style="flex:1;padding:14px;border-radius:10px;font-size:13px;text-align:center;cursor:pointer" onclick="icmChoose('merge')">
+        <div style="font-size:22px;margin-bottom:6px">➕</div>
+        <div style="font-weight:600;margin-bottom:4px">Add to canvas</div>
+        <div style="font-size:11px;color:var(--tx3)">Keep existing diagram and add imported nodes alongside</div>
+      </button>
+    </div>
+    <div class="mact" style="margin-top:14px">
+      <button class="btn-g" onclick="document.getElementById('import-choice-modal').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom dialog (replaces prompt/alert/confirm — needed for SharePoint sandbox) -->
+<div id="dlg-modal" class="mbdrop" style="display:none">
+  <div class="modal" style="width:380px">
+    <h2 id="dlg-title" style="margin-bottom:10px"></h2>
+    <p id="dlg-msg" style="font-size:13px;color:var(--tx2);margin-bottom:14px;white-space:pre-wrap"></p>
+    <input id="dlg-input" class="pi" style="display:none;margin-bottom:14px" placeholder="">
+    <div class="mact">
+      <button id="dlg-cancel" class="btn-g" style="display:none" onclick="dlgResolve(false)">Cancel</button>
+      <button id="dlg-ok" class="btn-p" onclick="dlgResolve(document.getElementById('dlg-input').style.display!=='none'?document.getElementById('dlg-input').value:true)">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- edge modal -->
+<div id="edge-modal" class="mbdrop" style="display:none" onclick="if(event.target===this)closeEdgeModal()">
+  <div class="modal">
+    <h2>Connection details</h2>
+    <div class="pg"><div class="pl">Data / description</div>
+      <textarea class="pta" id="em-label" placeholder="e.g. JSON payload, order ID, auth token…" rows="3"></textarea></div>
+    <div class="pg"><div class="pl">Protocol</div>
+      <div style="position:relative">
+        <div style="display:flex;gap:0">
+          <input class="pi" id="em-proto" placeholder="Type or select a protocol…" autocomplete="off" style="border-radius:7px 0 0 7px;flex:1" oninput="filterProtoDropdown(this.value)">
+          <button type="button" onclick="toggleProtoDropdown(this)" style="padding:0 10px;border:1px solid var(--bd);border-left:none;border-radius:0 7px 7px 0;background:var(--s2);cursor:pointer;font-size:11px;color:var(--tx3)">▾</button>
+        </div>
+        <div id="proto-custom-dropdown" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:4000;max-height:200px;overflow-y:auto;min-width:200px"></div>
+      </div>
+    </div>
+    <div class="mact">
+      <button class="btn-d" onclick="deleteEdge()">Delete</button>
+      <button class="btn-g" onclick="closeEdgeModal()">Cancel</button>
+      <button class="btn-p" onclick="saveEdge()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- type editor modal -->
+<div id="type-modal" class="mbdrop" style="display:none" onclick="if(event.target===this)closeTypeModal()">
+  <div class="modal" style="width:460px">
+    <h2 id="tm-title">Edit type</h2>
+    <div class="pg"><div class="pl">Name</div><input class="pi" id="tm-name" placeholder="e.g. Load Balancer"></div>
+    <div class="pg"><div class="pl">Description</div><input class="pi" id="tm-sub" placeholder="e.g. NGINX, HAProxy"></div>
+    <div class="pg"><div class="pl">Icon</div>
+      <div class="icon-grid" id="tm-icon-grid"></div>
+      <input class="pi" id="tm-icon-custom" placeholder="Or type any character/emoji" style="margin-top:8px;width:100px" maxlength="2">
+    </div>
+    <div class="pg"><div class="pl">Color</div>
+      <div class="cr" id="tm-colors"></div>
+    </div>
+    <div class="mact">
+      <button class="btn-d" id="tm-del" onclick="deleteType()">Delete type</button>
+      <button class="btn-g" onclick="closeTypeModal()">Cancel</button>
+      <button class="btn-p" onclick="saveType()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let nodes={}, edges=[], shapes=[], texts=[];
+let nodeTypes=[];
+let selNode=null, selEdge=null, selShape=null;
+let selNodes=new Set();   // multi-select set of node ids
+let nodeCounter=0, edgeCounter=0, typeCounter=0, shapeCounter=0;
+let connectMode=false, connectFrom=null;
+let dragging=null, dragOffX=0, dragOffY=0;
+let dragMultiOffsets={};  // {id: {dx,dy}} for multi-drag
+let scale=1;
+let editEdgeId=null;
+let currentTab='apps';
+let drawMode=null;
+let drawStart=null, drawPreview=null;
+let editTypeId=null;
+// Pan (infinite canvas)
+let panX=0, panY=0;
+let panning=false, panStartX=0, panStartY=0, panStartPanX=0, panStartPanY=0;
+let spaceDown=false;
+// Rubber-band
+let rubberBanding=false, rbStart=null;
+let lassoMode=false;
+// Undo history
+const UNDO_LIMIT=50;
+let undoStack=[];
+let _undoPaused=false; // prevent nested snapshot during undo restore
+const GRID=40;
+// Clipboard
+let clipboard=[];
+// Connection protocols (editable list)
+let connectionProtocols=['REST / HTTP','gRPC','GraphQL','WebSocket','Message queue','Database query','File transfer','Event stream','Other'];
+// View filters
+let viewFilters={portfolio:new Set(), eai:new Set(), techFlags:new Set(), coe:new Set()};
+// Popup state
+let cpView='detail', cpActiveTypes=new Set(), cpExpanded={}, cpNodeId=null;
+
+// ── Built-in node types ───────────────────────────────────────────────────────
+const BUILTIN_TYPES = [
+  {id:'app',     label:'Application',    sub:'Web / mobile / desktop', icon:'◼', color:'#f1f5f9', iconColor:'#3b82f6'},
+  {id:'api',     label:'API / Gateway',  sub:'REST, GraphQL, gRPC',    icon:'⇄', color:'#ede9fe', iconColor:'#8b5cf6'},
+  {id:'db',      label:'Database',       sub:'SQL / NoSQL / cache',    icon:'⊞', color:'#fef3c7', iconColor:'#f59e0b'},
+  {id:'queue',   label:'Message Queue',  sub:'Kafka, RabbitMQ, SQS',   icon:'≡', color:'#fce7f3', iconColor:'#ec4899'},
+  {id:'service', label:'Microservice',   sub:'Backend / worker',       icon:'⬡', color:'#dcfce7', iconColor:'#10b981'},
+  {id:'external',label:'External System',sub:'Third-party / vendor',   icon:'⊕', color:'#f1f5f9', iconColor:'#6b7280'},
+  {id:'user',    label:'User / Client',  sub:'Browser, mobile, CLI',   icon:'◎', color:'#e0f2fe', iconColor:'#0ea5e9'},
+  {id:'storage', label:'Storage / CDN',  sub:'S3, blob, CDN, FS',      icon:'▦', color:'#fef9c3', iconColor:'#eab308'},
+  {id:'wd',      label:'WD Integration', sub:'Workday integration',     icon:'⇋', color:'#fef0f9', iconColor:'#c026d3', svgIcon:true},
+];
+const PALETTE = ['#f1f5f9','#dbeafe','#ede9fe','#dcfce7','#fef3c7','#fce7f3','#e0f2fe','#fef9c3','#fff7ed','#f0fdf4','#f8fafc','#fafaf5'];
+const ICONS = ['◼','⇄','⊞','≡','⬡','⊕','◎','▦','⬢','⬟','◈','⊗','⊘','❖','⌬','⬤','◐','◑','⬛','▣','☁','⚙','⚡','🔒','📦','🌐','🖥','📡','🔑','💾'];
+
+function getType(id){ return nodeTypes.find(t=>t.id===id); }
+function snapPt(v){ return snapEnabled ? Math.round(v/GRID)*GRID : v; }
+function toggleSnap(){
+  snapEnabled=!snapEnabled;
+  document.getElementById('btn-snap').classList.toggle('active',snapEnabled);
+}
+function toggleLasso(){
+  lassoMode=!lassoMode;
+  document.getElementById('btn-lasso').classList.toggle('active',lassoMode);
+  document.getElementById('canvas-wrap').style.cursor=lassoMode?'crosshair':'grab';
+  document.getElementById('mode-label').textContent=lassoMode?'Lasso mode — drag to select':'Select mode';
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+function init(){
+  nodeTypes = BUILTIN_TYPES.map(t=>({...t}));
+  typeCounter = 100;
+  snapEnabled=true;
+  document.getElementById('btn-snap').classList.add('active');
+  renderPanel();
+  applyCanvasTransform();
+  initFilterBar();
+  updateProtocolDatalist();
+  initEdgeHover();
+  const cw=document.getElementById('canvas-wrap');
+  cw.addEventListener('dragover',e=>e.preventDefault());
+  cw.addEventListener('drop',onDrop);
+  cw.addEventListener('mousedown',onCanvasMouseDown);
+  document.addEventListener('mousemove',onMouseMove);
+  document.addEventListener('mouseup',onMouseUp);
+  cw.addEventListener('wheel',e=>{
+    e.preventDefault();
+    zoom(e.deltaY<0 ? 0.1 : -0.1);
+  },{passive:false});
+  // draw layer events
+  const dl=document.getElementById('draw-layer');
+  dl.addEventListener('mousedown',onDrawStart);
+  dl.addEventListener('mousemove',onDrawMove);
+  dl.addEventListener('mouseup',onDrawEnd);
+  document.addEventListener('click',e=>{
+    closeAllFbDropdowns();
+    if(!e.target.closest('#proto-custom-dropdown')&&!e.target.closest('#em-proto')&&e.target.id!=='em-proto')closeProtoDropdown();
+  });
+  document.addEventListener('keydown',onKeyDown);
+  document.addEventListener('keyup',e=>{ if(e.key===' '){spaceDown=false;document.getElementById('canvas-wrap').style.cursor='';} });
+}
+
+// ── Panel rendering ───────────────────────────────────────────────────────────
+function renderPanel(){
+  if(currentTab==='apps') renderAppsTab();
+  else if(currentTab==='types') renderTypesTab();
+  else if(currentTab==='settings') renderSettingsTab();
+}
+
+function renderAppsTab(){
+  const el=document.getElementById('panel-list');
+  el.innerHTML='';
+  const hdr=document.createElement('div');
+  hdr.className='ph';
+  hdr.innerHTML='<span>Drag to canvas</span>';
+  el.appendChild(hdr);
+  nodeTypes.forEach(nt=>{
+    const row=document.createElement('div');
+    row.className='nt-row';
+    row.draggable=true;
+    row.innerHTML=`
+      <div class="nt-icon" style="background:${nt.color};color:${nt.iconColor}">${nt.id==='wd'?WD_SVG:nt.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="nt-label">${esc(nt.label)}</div>
+        <div class="nt-sub">${esc(nt.sub)}</div>
+      </div>`;
+    row.addEventListener('dragstart',e=>e.dataTransfer.setData('nodeType',nt.id));
+    el.appendChild(row);
+  });
+  // shapes section
+  const shdr=document.createElement('div');
+  shdr.className='ph';
+  shdr.innerHTML='<span>Shapes &amp; text</span>';
+  el.appendChild(shdr);
+  [
+    {id:'rect',label:'Rectangle',svg:'<rect x="3" y="5" width="30" height="18" rx="3" fill="none" stroke="#6b7280" stroke-width="1.5"/>'},
+    {id:'ellipse',label:'Ellipse',svg:'<ellipse cx="18" cy="14" rx="15" ry="9" fill="none" stroke="#6b7280" stroke-width="1.5"/>'},
+    {id:'arrow',label:'Arrow',svg:'<line x1="4" y1="14" x2="28" y2="14" stroke="#6b7280" stroke-width="1.5" marker-end="url(#ah-draw)"/>'},
+    {id:'text',label:'Text label',svg:'<text x="5" y="19" font-size="14" fill="#6b7280" font-family="sans-serif" font-weight="500">Aa</text>'},
+  ].forEach(s=>{
+    const row=document.createElement('div');
+    row.className='sh-row';
+    row.style.cursor='pointer';
+    row.innerHTML=`<div class="sh-preview"><svg viewBox="0 0 36 28" xmlns="http://www.w3.org/2000/svg"><defs><marker id="ah-draw" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#374151"/></marker></defs>${s.svg}</svg></div><span style="font-size:12px">${s.label}</span>`;
+    row.addEventListener('click',()=>setDrawMode(s.id));
+    el.appendChild(row);
+  });
+}
+
+function renderTypesTab(){
+  const el=document.getElementById('panel-list');
+  el.innerHTML='';
+  const hdr=document.createElement('div');
+  hdr.className='ph';
+  hdr.innerHTML='<span>App types</span><span class="ph-add" onclick="openNewTypeModal()" title="Add type">+</span>';
+  el.appendChild(hdr);
+  nodeTypes.forEach(nt=>{
+    const row=document.createElement('div');
+    row.className='nt-row';
+    row.style.cursor='default';
+    row.innerHTML=`
+      <div class="nt-icon" style="background:${nt.color};color:${nt.iconColor}">${nt.id==='wd'?WD_SVG:nt.icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="nt-label">${esc(nt.label)}</div>
+        <div class="nt-sub">${esc(nt.sub)}</div>
+      </div>
+      <button class="nt-edit" onclick="openEditTypeModal('${nt.id}')" title="Edit">✎</button>`;
+    el.appendChild(row);
+  });
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.panel-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab)?.classList.add('active');
+  document.getElementById('panel-props').style.display='none';
+  document.getElementById('panel-list').style.display='';
+  renderPanel();
+  if(tab==='props'&&selNode){
+    document.getElementById('panel-list').style.display='none';
+    document.getElementById('panel-props').style.display='block';
+  }
+}
+
+// ── Settings: protocol list ───────────────────────────────────────────────────
+function renderSettingsTab(){
+  const el=document.getElementById('panel-list');
+  el.innerHTML='';
+  const hdr=document.createElement('div');hdr.className='settings-section';hdr.textContent='Connection protocols';
+  el.appendChild(hdr);
+
+  connectionProtocols.forEach((proto,i)=>{
+    const row=document.createElement('div');row.className='proto-item';
+    const nameEl=document.createElement('span');nameEl.className='proto-item-name';nameEl.title=proto;
+
+    // Inline edit on click
+    nameEl.textContent=proto;
+    nameEl.style.cursor='text';
+    nameEl.addEventListener('click',()=>startProtoInlineEdit(nameEl,i));
+
+    const upBtn=document.createElement('button');upBtn.className='proto-item-btn';upBtn.title='Move up';upBtn.textContent='↑';
+    upBtn.style.display=i===0?'none':'flex';
+    upBtn.addEventListener('click',()=>{
+      [connectionProtocols[i-1],connectionProtocols[i]]=[connectionProtocols[i],connectionProtocols[i-1]];
+      updateProtocolDatalist();renderSettingsTab();
+    });
+
+    const dnBtn=document.createElement('button');dnBtn.className='proto-item-btn';dnBtn.title='Move down';dnBtn.textContent='↓';
+    dnBtn.style.display=i===connectionProtocols.length-1?'none':'flex';
+    dnBtn.addEventListener('click',()=>{
+      [connectionProtocols[i],connectionProtocols[i+1]]=[connectionProtocols[i+1],connectionProtocols[i]];
+      updateProtocolDatalist();renderSettingsTab();
+    });
+
+    const delBtn=document.createElement('button');delBtn.className='proto-item-btn del';delBtn.title='Delete';delBtn.textContent='×';
+    delBtn.addEventListener('click',()=>{
+      if(connectionProtocols.length<=1)return;
+      connectionProtocols.splice(i,1);
+      updateProtocolDatalist();renderSettingsTab();
+    });
+
+    row.appendChild(nameEl);row.appendChild(upBtn);row.appendChild(dnBtn);row.appendChild(delBtn);
+    el.appendChild(row);
+  });
+
+  // Add new protocol row
+  const addRow=document.createElement('div');addRow.className='proto-add-row';
+  const inp=document.createElement('input');inp.placeholder='New protocol name…';inp.id='proto-new-input';
+  const addBtn=document.createElement('button');addBtn.textContent='+ Add';
+  addBtn.addEventListener('click',()=>{
+    const val=inp.value.trim();
+    if(!val||connectionProtocols.includes(val))return;
+    connectionProtocols.push(val);
+    inp.value='';
+    updateProtocolDatalist();renderSettingsTab();
+  });
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.stopPropagation();addBtn.click();} });
+  addRow.appendChild(inp);addRow.appendChild(addBtn);
+  el.appendChild(addRow);
+  // ── Bulk import section ──
+  const importHdr=document.createElement('div');importHdr.className='settings-section';importHdr.textContent='Bulk update from Excel';
+  el.appendChild(importHdr);
+
+  const importDesc=document.createElement('div');
+  importDesc.style.cssText='padding:9px 14px;font-size:11px;color:var(--tx3);line-height:1.5;border-bottom:1px solid var(--bd)';
+  importDesc.innerHTML='Upload an Excel file with columns:<br><strong>EAI, Tech Flags, COE 1, COE 2</strong><br>Each row updates the matching node by EAI number. Tech Flags should be comma-separated.';
+  el.appendChild(importDesc);
+
+  const btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--bd)';
+
+  const dlBtn=document.createElement('button');
+  dlBtn.textContent='⬇ Download template';
+  dlBtn.style.cssText='flex:1;padding:7px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);color:var(--tx2);font-size:12px;cursor:pointer';
+  dlBtn.addEventListener('click',downloadImportTemplate);
+
+  const upBtn2=document.createElement('button');
+  upBtn2.textContent='⬆ Upload & update';
+  upBtn2.style.cssText='flex:1;padding:7px;border-radius:6px;border:none;background:var(--ac);color:#fff;font-size:12px;cursor:pointer;font-weight:500';
+  upBtn2.addEventListener('click',()=>document.getElementById('bulk-import-input').click());
+
+  btnRow.appendChild(dlBtn);btnRow.appendChild(upBtn2);
+  el.appendChild(btnRow);
+
+  // Import result area
+  const resultDiv=document.createElement('div');
+  resultDiv.id='import-result';
+  resultDiv.style.cssText='padding:8px 14px;font-size:11px;color:var(--grn);display:none';
+  el.appendChild(resultDiv);
+}
+
+function startProtoInlineEdit(nameEl,i){
+  const orig=connectionProtocols[i];
+  const inp=document.createElement('input');
+  inp.value=orig;inp.style.cssText='flex:1;padding:2px 4px;border:1px solid var(--ac);border-radius:4px;font-size:12px;font-family:inherit;outline:none;min-width:0';
+  nameEl.replaceWith(inp);inp.focus();inp.select();
+  const commit=()=>{
+    const val=inp.value.trim()||orig;
+    connectionProtocols[i]=val;
+    updateProtocolDatalist();renderSettingsTab();
+  };
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.stopPropagation();inp.blur();}
+    if(e.key==='Escape'){inp.value=orig;inp.blur();}
+    e.stopPropagation();
+  });
+}
+
+function updateProtocolDatalist(){
+  // Keep datalist in sync for any remaining list= references, and rebuild custom dropdown options
+  const dl=document.getElementById('proto-datalist');
+  if(dl){ dl.innerHTML=''; connectionProtocols.forEach(p=>{ const o=document.createElement('option');o.value=p;dl.appendChild(o); }); }
+}
+
+function toggleProtoDropdown(triggerEl){
+  const dd=document.getElementById('proto-custom-dropdown');
+  if(dd.style.display==='none'){ openProtoDropdown('', triggerEl||document.getElementById('em-proto')); } else { closeProtoDropdown(); }
+}
+
+function openProtoDropdown(filter, anchorEl){
+  const inp=document.getElementById('em-proto');
+  const anchor=anchorEl||inp;
+  const dd=document.getElementById('proto-custom-dropdown');
+  const filtered=filter?connectionProtocols.filter(p=>p.toLowerCase().includes(filter.toLowerCase())):connectionProtocols;
+  dd.innerHTML='';
+  if(!filtered.length){
+    const empty=document.createElement('div');empty.style.cssText='padding:8px 12px;font-size:12px;color:var(--tx3);font-style:italic';empty.textContent='No matches';
+    dd.appendChild(empty);
+  }
+  filtered.forEach(p=>{
+    const item=document.createElement('div');
+    item.textContent=p;
+    item.style.cssText='padding:8px 12px;font-size:12px;cursor:pointer;transition:background .1s;white-space:nowrap';
+    item.addEventListener('mouseenter',()=>item.style.background='var(--s2)');
+    item.addEventListener('mouseleave',()=>item.style.background='');
+    item.addEventListener('mousedown',e=>{
+      e.preventDefault();
+      if(inp) inp.value=p;
+      closeProtoDropdown();
+    });
+    dd.appendChild(item);
+  });
+  // Position below the anchor element
+  const r=anchor.getBoundingClientRect();
+  dd.style.left=r.left+'px';
+  dd.style.top=(r.bottom+2)+'px';
+  dd.style.width=Math.max(200, r.width+32)+'px';
+  dd.style.display='block';
+}
+
+function closeProtoDropdown(){
+  const dd=document.getElementById('proto-custom-dropdown');
+  if(dd) dd.style.display='none';
+}
+
+function filterProtoDropdown(val){
+  const dd=document.getElementById('proto-custom-dropdown');
+  const inp=document.getElementById('em-proto');
+  if(dd.style.display!=='none') openProtoDropdown(val, inp);
+}
+
+// ── Type modal ────────────────────────────────────────────────────────────────
+function openNewTypeModal(){
+  editTypeId=null;
+  document.getElementById('tm-title').textContent='New app type';
+  document.getElementById('tm-name').value='';
+  document.getElementById('tm-sub').value='';
+  document.getElementById('tm-icon-custom').value='';
+  document.getElementById('tm-del').style.display='none';
+  renderTypeIconGrid('◼');
+  renderTypeColors('#f1f5f9');
+  document.getElementById('type-modal').style.display='flex';
+}
+function openEditTypeModal(id){
+  editTypeId=id;
+  const nt=getType(id);
+  document.getElementById('tm-title').textContent='Edit type';
+  document.getElementById('tm-name').value=nt.label;
+  document.getElementById('tm-sub').value=nt.sub;
+  document.getElementById('tm-icon-custom').value='';
+  document.getElementById('tm-del').style.display= BUILTIN_TYPES.find(b=>b.id===id) ? 'none' : '';
+  renderTypeIconGrid(nt.icon);
+  renderTypeColors(nt.color);
+  document.getElementById('type-modal').style.display='flex';
+}
+function renderTypeIconGrid(selIcon){
+  const g=document.getElementById('tm-icon-grid');
+  g.innerHTML='';
+  ICONS.forEach(ic=>{
+    const d=document.createElement('div');
+    d.className='icon-opt'+(ic===selIcon?' sel':'');
+    d.textContent=ic;
+    d.onclick=()=>{g.querySelectorAll('.icon-opt').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');document.getElementById('tm-icon-custom').value='';};
+    g.appendChild(d);
+  });
+}
+function renderTypeColors(selColor){
+  const c=document.getElementById('tm-colors');
+  c.innerHTML='';
+  PALETTE.forEach(col=>{
+    const d=document.createElement('div');
+    d.className='csw'+(col===selColor?' sel':'');
+    d.style.background=col;
+    d.onclick=()=>{c.querySelectorAll('.csw').forEach(x=>x.classList.remove('sel'));d.classList.add('sel');};
+    c.appendChild(d);
+  });
+}
+function getSelectedTypeIcon(){
+  const custom=document.getElementById('tm-icon-custom').value.trim();
+  if(custom) return custom[0];
+  const sel=document.getElementById('tm-icon-grid').querySelector('.sel');
+  return sel?sel.textContent:'◼';
+}
+function getSelectedTypeColor(){
+  const sel=document.getElementById('tm-colors').querySelector('.sel');
+  return sel?sel.style.background:'#f1f5f9';
+}
+// pick a contrasting icon color from the background
+function iconColorFor(bg){
+  const hex=bg.replace('#','');
+  if(hex.length!==6)return'#374151';
+  const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);
+  const lum=(0.299*r+0.587*g+0.114*b)/255;
+  return lum>0.6?'#374151':'#ffffff';
+}
+function saveType(){
+  const name=document.getElementById('tm-name').value.trim();
+  if(!name){document.getElementById('tm-name').focus();return;}
+  const icon=getSelectedTypeIcon();
+  const color=getSelectedTypeColor();
+  const iconColor=iconColorFor(color);
+  const sub=document.getElementById('tm-sub').value.trim();
+  if(editTypeId){
+    const nt=getType(editTypeId);
+    nt.label=name;nt.sub=sub;nt.icon=icon;nt.color=color;nt.iconColor=iconColor;
+    // re-render all nodes of this type
+    Object.values(nodes).filter(n=>n.type===editTypeId).forEach(n=>renderNode(n,true));
+  } else {
+    const id='custom-'+(++typeCounter);
+    nodeTypes.push({id,label:name,sub,icon,color,iconColor});
+  }
+  closeTypeModal();
+  renderPanel();
+}
+async function deleteType(){
+  if(!editTypeId)return;
+  if(Object.values(nodes).some(n=>n.type===editTypeId)){
+    await dlgAlert('Cannot delete a type that is in use on the canvas.');return;
+  }
+  nodeTypes=nodeTypes.filter(t=>t.id!==editTypeId);
+  closeTypeModal();renderPanel();
+}
+function closeTypeModal(){document.getElementById('type-modal').style.display='none';editTypeId=null;}
+
+// ── Canvas transform (pan + scale) ───────────────────────────────────────────
+function applyCanvasTransform(){
+  const t=`translate(${panX}px,${panY}px) scale(${scale})`;
+  document.getElementById('canvas').style.transform=t;
+  document.getElementById('svg-layer').style.transform=t;
+  document.getElementById('draw-layer').style.transform=t;
+  // Scale grid dots with zoom
+  const gs=GRID*scale;
+  document.getElementById('canvas-bg').querySelector('pattern').setAttribute('width',gs);
+  document.getElementById('canvas-bg').querySelector('pattern').setAttribute('height',gs);
+  document.getElementById('canvas-bg').querySelector('pattern').setAttribute('patternTransform',`translate(${panX%gs},${panY%gs})`);
+}
+function clientToCanvas(cx,cy){
+  const r=document.getElementById('canvas-wrap').getBoundingClientRect();
+  return{x:((cx-r.left)-panX)/scale, y:((cy-r.top)-panY)/scale};
+}
+
+// ── Drop / Create node ────────────────────────────────────────────────────────
+function onDrop(e){
+  e.preventDefault();
+  const type=e.dataTransfer.getData('nodeType');
+  if(!type)return;
+  const p=clientToCanvas(e.clientX,e.clientY);
+  const x=snapPt(p.x-75), y=snapPt(p.y-30);
+  createNode(type,x,y);
+  document.getElementById('empty-state').style.display='none';
+}
+function createNode(type,x,y,opts={}){
+  const nt=getType(type);
+  if(!nt)return null;
+  pushUndo();
+  const id='node-'+(++nodeCounter);
+  nodes[id]={id,type,x,y,w:opts.w||160,h:opts.h||120,label:opts.label||nt.label,subtitle:opts.subtitle||'',color:opts.color||nt.color,eai:opts.eai||'',portfolio:opts.portfolio||[],techFlags:opts.techFlags||[],coe1:opts.coe1||'',coe2:opts.coe2||''};
+  renderNode(nodes[id],true);
+  selectNode(id);
+  if(typeof buildFbEaiDropdown==='function')buildFbEaiDropdown();
+  if(typeof buildFbCoeDropdown==='function')buildFbCoeDropdown();
+  return id;
+}
+
+// ── Render node ───────────────────────────────────────────────────────────────
+const MIN_NODE_W = 130, MIN_NODE_H = 60;
+
+// SVG icon for WD Integration (bidirectional arrows)
+const WD_SVG=`<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M2 5h10M9 2l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M14 11H4M7 8l-3 3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+function nodeIconHtml(nt){
+  if(nt&&nt.id==='wd') return WD_SVG;
+  return nt?nt.icon:'?';
+}
+
+function renderNode(node,forceContent=true){
+  const nt=getType(node.type);
+  let el=document.getElementById(node.id);
+  const isNew=!el;
+  if(isNew){
+    el=document.createElement('div');el.id=node.id;el.className='node';
+    document.getElementById('canvas').appendChild(el);
+  }
+  // Canvas handles scale via CSS transform — nodes just use raw canvas coords & sizes
+  el.style.left=node.x+'px';
+  el.style.top=node.y+'px';
+  el.style.transform='none';
+  el.style.width=node.w+'px';
+  el.style.height=node.h+'px';
+  el.style.overflow='hidden';
+  el.style.minWidth='unset';
+
+  if(forceContent){
+    const ic=nodeIconHtml(nt);
+    const col=node.color||(nt?nt.color:'#f1f5f9');
+    const icol=nt?nt.iconColor:'#374151';
+    el.innerHTML=`
+      <div class="nh" style="background:${col}">
+        <div class="ni" style="background:rgba(255,255,255,.7);color:${icol};font-size:13px">${ic}</div>
+        <div class="ntitle" style="font-size:12px">${esc(node.label)}</div>
+        <button class="ibtn" data-nid="${node.id}" title="Info &amp; connections" style="flex-shrink:0;margin-left:4px">ⓘ</button>
+        <div class="port" data-node="${node.id}" title="Click to connect" style="flex-shrink:0;margin-left:4px"></div>
+      </div>
+      ${node.subtitle?`<div class="nsub" style="font-size:10px">${esc(node.subtitle)}</div>`:''}
+      ${node.eai||(node.portfolio&&node.portfolio.length)||(node.coe1||node.coe2)?`<div style="padding:0 11px 4px;font-size:9px;color:var(--tx3);line-height:1.7">${node.eai?`<span style="font-weight:600">EAI:</span> ${esc(node.eai)}<br>`:''}${node.portfolio&&node.portfolio.length?`<span style="font-weight:600">Portfolio:</span> ${esc(node.portfolio.join(', '))}${node.coe1||node.coe2?'<br>':''}`:''  }${node.coe1?`<span style="font-weight:600">COE 1:</span> ${esc(node.coe1)}${node.coe2?' &nbsp;':'<br>'}`:''}${node.coe2?`<span style="font-weight:600">COE 2:</span> ${esc(node.coe2)}`:''}</div>`:''}
+      ${node.techFlags&&node.techFlags.length?`<div class="node-meta"><span style="font-weight:600">Tech Flags:</span> ${esc(node.techFlags.join(', '))}</div>`:''}
+      <div style="height:6px"></div>`;
+    el.querySelector('.port').addEventListener('click',e=>{e.stopPropagation();startConnect(node.id);});
+    el.querySelector('.ibtn').addEventListener('click',e=>{e.stopPropagation();openConnPopup(node.id,e);});
+
+    // Double-click title to edit inline
+    el.querySelector('.ntitle').addEventListener('dblclick',e=>{
+      e.stopPropagation();
+      const titleEl=e.currentTarget;
+      titleEl.contentEditable='true';
+      titleEl.classList.add('editing');
+      // place cursor at end
+      const range=document.createRange();
+      range.selectNodeContents(titleEl);
+      range.collapse(false);
+      const sel=window.getSelection();
+      sel.removeAllRanges();sel.addRange(range);
+      titleEl.focus();
+
+      const commit=()=>{
+        titleEl.contentEditable='false';
+        titleEl.classList.remove('editing');
+        const newLabel=titleEl.textContent.trim()||node.label;
+        titleEl.textContent=newLabel;
+        nodes[node.id].label=newLabel;
+        // sync props panel if open
+        const inp=document.getElementById('pp-label');
+        if(inp) inp.value=newLabel;
+      };
+      titleEl.addEventListener('keydown',ev=>{
+        if(ev.key==='Enter'){ev.preventDefault();titleEl.blur();}
+        if(ev.key==='Escape'){titleEl.textContent=node.label;titleEl.blur();}
+        ev.stopPropagation(); // prevent canvas shortcuts while typing
+      });
+      titleEl.addEventListener('blur',commit,{once:true});
+    });
+    el.addEventListener('mousedown',e=>{
+      if(connectMode)return;
+      if(e.target.classList.contains('port')||e.target.classList.contains('ibtn')||e.target.classList.contains('resize-handle'))return;
+      // Don't drag if the title is in edit mode — let the browser handle text selection
+      if(e.target.classList.contains('editing')||e.target.closest('.editing'))return;
+      e.stopPropagation();
+      if(e.ctrlKey||e.metaKey){
+        // Ctrl/Cmd+click: toggle multi-select
+        toggleMultiSel(node.id);
+      } else if(selNodes.has(node.id)&&selNodes.size>1){
+        // Clicking an already multi-selected node — check if shapes also selected
+        const hasSelShapes=document.querySelectorAll('.cshape.selected,.ctextblock.selected').length>0;
+        if(hasSelShapes) startGroupDrag(e);
+        else startMultiDrag(e);
+      } else {
+        const hasSelShapes=document.querySelectorAll('.cshape.selected,.ctextblock.selected').length>0;
+        if(hasSelShapes&&selNodes.has(node.id)){
+          startGroupDrag(e);
+        } else {
+          selNodes.clear();
+          document.querySelectorAll('.node.multi-sel').forEach(n=>n.classList.remove('multi-sel'));
+          startDrag(e,node.id);
+          selectNode(node.id);
+        }
+      }
+    });
+    el.addEventListener('click',e=>{
+      if(!connectMode)return;
+      if(e.target.classList.contains('port'))return;
+      e.stopPropagation();completeConnect(node.id);
+    });
+  }
+  syncResizeHandles(node.id);
+}
+
+function syncResizeHandles(id){
+  const el=document.getElementById(id);if(!el)return;
+  // Remove old handles
+  el.querySelectorAll('.resize-handle').forEach(h=>h.remove());
+  if(selNode!==id)return;
+  // Add 4 corner handles
+  ['nw','ne','se','sw'].forEach(corner=>{
+    const h=document.createElement('div');
+    h.className=`resize-handle ${corner}`;
+    h.dataset.corner=corner;
+    h.dataset.nid=id;
+    h.addEventListener('mousedown',e=>{
+      e.stopPropagation();e.preventDefault();
+      startResize(e,id,corner);
+    });
+    el.appendChild(h);
+  });
+}
+function updateNodeTitle(id){
+  const el=document.getElementById(id);if(!el)return;
+  const t=el.querySelector('.ntitle');if(t)t.textContent=nodes[id].label;
+}
+
+// ── Multi-select helpers ──────────────────────────────────────────────────────
+function toggleMultiSel(id){
+  if(selNodes.has(id)){
+    selNodes.delete(id);
+    document.getElementById(id)?.classList.remove('multi-sel','selected');
+    syncResizeHandles(id);
+  } else {
+    // deselect single selection first
+    if(selNode&&selNode!==id){
+      document.getElementById(selNode)?.classList.remove('selected');
+      syncResizeHandles(selNode);
+    }
+    selNode=null;
+    selNodes.add(id);
+    document.getElementById(id)?.classList.add('multi-sel');
+  }
+  hideProps();
+}
+
+// ── Drag & Resize ─────────────────────────────────────────────────────────────
+let resizing=null;
+
+function startDrag(e,id){
+  dragging={kind:'node',id};
+  const p=clientToCanvas(e.clientX,e.clientY);
+  dragOffX=p.x-nodes[id].x;
+  dragOffY=p.y-nodes[id].y;
+}
+function startMultiDrag(e){
+  dragging={kind:'multi'};
+  const p=clientToCanvas(e.clientX,e.clientY);
+  dragOffX=p.x; dragOffY=p.y;
+  dragMultiOffsets={};
+  selNodes.forEach(id=>{ dragMultiOffsets[id]={dx:nodes[id].x-p.x, dy:nodes[id].y-p.y}; });
+}
+function startResize(e,id,corner){
+  const node=nodes[id];
+  const p=clientToCanvas(e.clientX,e.clientY);
+  resizing={id,corner,startMouseX:p.x,startMouseY:p.y,startX:node.x,startY:node.y,startW:node.w,startH:node.h};
+  document.body.style.cursor=corner+'-resize';
+}
+function startShapeDrag(e,id,kind){
+  dragging={kind,id};
+  const p=clientToCanvas(e.clientX,e.clientY);
+  const obj=kind==='shape'?shapes.find(s=>s.id===id):texts.find(t=>t.id===id);
+  dragOffX=p.x-obj.x; dragOffY=p.y-obj.y;
+}
+
+function startGroupDrag(e){
+  const p=clientToCanvas(e.clientX,e.clientY);
+  dragOffX=p.x; dragOffY=p.y;
+  dragMultiOffsets={};
+  selNodes.forEach(id=>{ if(nodes[id]) dragMultiOffsets['n:'+id]={kind:'node',id,dx:nodes[id].x-p.x,dy:nodes[id].y-p.y}; });
+  document.querySelectorAll('.cshape.selected').forEach(el=>{
+    const sid=el.dataset.id;
+    const s=shapes.find(sh=>sh.id===sid);
+    if(s) dragMultiOffsets['s:'+sid]={kind:'shape',id:sid,dx:s.x-p.x,dy:s.y-p.y};
+  });
+  document.querySelectorAll('.ctextblock.selected').forEach(el=>{
+    const tid=el.dataset.id;
+    const t=texts.find(tx=>tx.id===tid);
+    if(t) dragMultiOffsets['t:'+tid]={kind:'text',id:tid,dx:t.x-p.x,dy:t.y-p.y};
+  });
+  dragging={kind:'group'};
+}
+
+function onMouseMove(e){
+  // ── Pan ──
+  if(panning){
+    panX=panStartPanX+(e.clientX-panStartX);
+    panY=panStartPanY+(e.clientY-panStartY);
+    applyCanvasTransform();
+    return;
+  }
+  // ── Rubber-band pending (lasso mode click, waiting for drag) ──
+  if(dragging&&dragging.kind==='rb-pending'){
+    const moved=Math.abs(e.clientX-dragging.startX)>4||Math.abs(e.clientY-dragging.startY)>4;
+    if(moved){
+      rubberBanding=true;
+      dragging=null;
+      const sr=document.getElementById('sel-rect');
+      sr.style.left=(rbStart.x*scale+panX)+'px'; sr.style.top=(rbStart.y*scale+panY)+'px';
+      sr.style.width='0'; sr.style.height='0'; sr.style.display='block';
+    }
+    return;
+  }
+  // ── Rubber-band ──
+  if(rubberBanding){
+    const p=clientToCanvas(e.clientX,e.clientY);
+    const rx=Math.min(rbStart.x,p.x), ry=Math.min(rbStart.y,p.y);
+    const rw=Math.abs(p.x-rbStart.x), rh=Math.abs(p.y-rbStart.y);
+    // Position sel-rect in screen coords
+    const sr=document.getElementById('sel-rect');
+    sr.style.left=(rx*scale+panX)+'px'; sr.style.top=(ry*scale+panY)+'px';
+    sr.style.width=(rw*scale)+'px'; sr.style.height=(rh*scale)+'px';
+    // Highlight nodes inside band
+    selNodes.clear();
+    document.querySelectorAll('.node.multi-sel').forEach(n=>n.classList.remove('multi-sel'));
+    Object.values(nodes).forEach(n=>{
+      const nw=n.w||160, nh=n.h||120;
+      if(n.x<rx+rw&&n.x+nw>rx&&n.y<ry+rh&&n.y+nh>ry){
+        selNodes.add(n.id);
+        document.getElementById(n.id)?.classList.add('multi-sel');
+      }
+    });
+    // Highlight shapes inside band
+    document.querySelectorAll('.cshape.selected').forEach(el=>el.classList.remove('selected'));
+    shapes.forEach(s=>{
+      const el=document.querySelector(`.cshape[data-id="${s.id}"]`);if(!el)return;
+      const inside=s.x<rx+rw&&s.x+(s.w||0)>rx&&s.y<ry+rh&&s.y+(s.h||0)>ry;
+      el.classList.toggle('selected',inside);
+    });
+    // Highlight text blocks inside band
+    document.querySelectorAll('.ctextblock.selected').forEach(el=>el.classList.remove('selected'));
+    texts.forEach(t=>{
+      const el=document.querySelector(`.ctextblock[data-id="${t.id}"]`);if(!el)return;
+      const tw=el.offsetWidth/scale||80, th=el.offsetHeight/scale||24;
+      const inside=t.x<rx+rw&&t.x+tw>rx&&t.y<ry+rh&&t.y+th>ry;
+      el.classList.toggle('selected',inside);
+    });
+    return;
+  }
+  // ── Resize ──
+  if(resizing){
+    const p=clientToCanvas(e.clientX,e.clientY);
+    const {corner,startX,startY,startW,startH,id}=resizing;
+    const node=nodes[id];
+    let newX=startX,newY=startY,newW=startW,newH=startH;
+    if(corner==='se'){
+      // snap right edge and bottom edge
+      const right =snapPt(p.x);
+      const bottom=snapPt(p.y);
+      newW=Math.max(MIN_NODE_W,right-startX);
+      newH=Math.max(MIN_NODE_H,bottom-startY);
+    } else if(corner==='sw'){
+      // snap left edge and bottom edge
+      const left  =snapPt(p.x);
+      const bottom=snapPt(p.y);
+      newX=Math.min(left,startX+startW-MIN_NODE_W);
+      newW=Math.max(MIN_NODE_W,(startX+startW)-newX);
+      newH=Math.max(MIN_NODE_H,bottom-startY);
+    } else if(corner==='ne'){
+      // snap right edge and top edge
+      const right=snapPt(p.x);
+      const top  =snapPt(p.y);
+      newW=Math.max(MIN_NODE_W,right-startX);
+      newY=Math.min(top,startY+startH-MIN_NODE_H);
+      newH=Math.max(MIN_NODE_H,(startY+startH)-newY);
+    } else if(corner==='nw'){
+      // snap left edge and top edge
+      const left=snapPt(p.x);
+      const top =snapPt(p.y);
+      newX=Math.min(left,startX+startW-MIN_NODE_W);
+      newW=Math.max(MIN_NODE_W,(startX+startW)-newX);
+      newY=Math.min(top,startY+startH-MIN_NODE_H);
+      newH=Math.max(MIN_NODE_H,(startY+startH)-newY);
+    }
+    node.x=Math.max(0,newX); node.y=Math.max(0,newY); node.w=newW; node.h=newH;
+    const el=document.getElementById(id);
+    el.style.left=node.x+'px'; el.style.top=node.y+'px';
+    el.style.width=node.w+'px'; el.style.height=node.h+'px';
+    redrawEdges(); return;
+  }
+  if(!dragging)return;
+  const p=clientToCanvas(e.clientX,e.clientY);
+  if(dragging.kind==='node'){
+    const nx=snapPt(p.x-dragOffX);
+    const ny=snapPt(p.y-dragOffY);
+    nodes[dragging.id].x=nx; nodes[dragging.id].y=ny;
+    const el=document.getElementById(dragging.id);
+    el.style.left=nx+'px'; el.style.top=ny+'px';
+    redrawEdges();
+  } else if(dragging.kind==='multi'){
+    selNodes.forEach(id=>{
+      const off=dragMultiOffsets[id];
+      const nx=snapPt(p.x+off.dx);
+      const ny=snapPt(p.y+off.dy);
+      nodes[id].x=nx; nodes[id].y=ny;
+      const el=document.getElementById(id);
+      if(el){el.style.left=nx+'px'; el.style.top=ny+'px';}
+    });
+    redrawEdges();
+  } else if(dragging.kind==='group'){
+    Object.values(dragMultiOffsets).forEach(off=>{
+      const nx=snapPt(p.x+off.dx), ny=snapPt(p.y+off.dy);
+      if(off.kind==='node'&&nodes[off.id]){
+        nodes[off.id].x=nx; nodes[off.id].y=ny;
+        const el=document.getElementById(off.id);
+        if(el){el.style.left=nx+'px'; el.style.top=ny+'px';}
+      } else if(off.kind==='shape'){
+        const s=shapes.find(sh=>sh.id===off.id);
+        if(s){s.x=nx; s.y=ny;}
+      } else if(off.kind==='text'){
+        const t=texts.find(tx=>tx.id===off.id);
+        if(t){t.x=nx; t.y=ny;}
+      }
+    });
+    renderShapes(); renderTexts(); redrawEdges();
+    const s=shapes.find(s=>s.id===dragging.id);if(!s)return;
+    s.x=p.x-dragOffX; s.y=p.y-dragOffY; renderShapes();
+  } else if(dragging.kind==='text'){
+    const t=texts.find(t=>t.id===dragging.id);if(!t)return;
+    t.x=p.x-dragOffX; t.y=p.y-dragOffY; renderTexts();
+  }
+}
+function onMouseUp(e){
+  if(resizing){resizing=null;document.body.style.cursor='';pushUndo();}
+  // Plain click in lasso mode (no drag) → exit lasso and clear selection
+  if(dragging&&dragging.kind==='rb-pending'){
+    dragging=null;
+    clearSelection();hideProps();
+    if(lassoMode) toggleLasso();
+    return;
+  }
+  if(rubberBanding){
+    rubberBanding=false;
+    document.getElementById('sel-rect').style.display='none';
+    const selShapeCount=document.querySelectorAll('.cshape.selected,.ctextblock.selected').length;
+    if(selNodes.size===1&&selShapeCount===0){
+      const id=[...selNodes][0];
+      selNodes.clear();
+      document.getElementById(id)?.classList.remove('multi-sel');
+      selectNode(id);
+    }
+    // else keep multi-sel (0 = nothing selected, 2+ = keep group)
+  }
+  if(panning){panning=false;document.getElementById('canvas-wrap').style.cursor=lassoMode?'crosshair':'grab';}
+  if(dragging&&(dragging.kind==='node'||dragging.kind==='multi'||dragging.kind==='shape'||dragging.kind==='text')) pushUndo();
+  dragging=null;
+}
+
+// ── Select ────────────────────────────────────────────────────────────────────
+function selectNode(id){
+  const prev=selNode;
+  // Clear any multi-sel
+  selNodes.clear();
+  document.querySelectorAll('.node.multi-sel').forEach(n=>n.classList.remove('multi-sel'));
+  if(prev){document.getElementById(prev)?.classList.remove('selected');syncResizeHandles(prev);}
+  selNode=id;
+  if(id){
+    document.getElementById(id)?.classList.add('selected');
+    syncResizeHandles(id);
+    showNodeProps(id);
+  } else {
+    hideProps();
+  }
+}
+function selectShape(id){
+  clearSelection();selShape=id;
+  document.querySelector(`.cshape[data-id="${id}"]`)?.classList.add('selected');
+}
+function clearSelection(){
+  selNodes.clear();
+  document.querySelectorAll('.node.multi-sel,.node.selected').forEach(n=>{n.classList.remove('multi-sel','selected');});
+  document.querySelectorAll('.cshape.selected').forEach(e=>e.classList.remove('selected'));
+  document.querySelectorAll('.ctextblock.selected').forEach(el=>{
+    el.classList.remove('selected');
+    const inner=el.querySelector('.ctextblock-inner');
+    const t=texts.find(t=>t.id===el.dataset.id);
+    exitTextEdit(inner,t);
+  });
+  if(selNode){syncResizeHandles(selNode);}
+  selNode=null;selShape=null;
+}
+
+function onCanvasMouseDown(e){
+  // Middle-click = pan always
+  if(e.button===1){
+    e.preventDefault();
+    panning=true; panStartX=e.clientX; panStartY=e.clientY;
+    panStartPanX=panX; panStartPanY=panY;
+    document.getElementById('canvas-wrap').style.cursor='grabbing';
+    return;
+  }
+
+  if(e.button!==0)return;
+
+  // If the click landed on an interactive element, let it handle itself
+  const interactive=e.target.closest('.node,.cshape,.ctextblock,.ibtn,.port,.resize-handle,.el-wrap,.fb-dropdown,.ms-dropdown,.modal,.tbbtn,#zoom-controls,#connect-hint,#empty-state,#conn-popup,#save-menu,#slots-modal,#edge-modal,#type-modal,#import-choice-modal,#edge-pill-hover,#proto-custom-dropdown');
+  if(interactive)return;
+
+  if(connectMode){ exitConnectMode(); return; }
+
+  // SVG edge hits handle their own clicks — don't interfere
+  if(e.target.closest&&e.target.closest('#svg-layer')&&e.target.tagName==='path') return;
+
+  if((e.ctrlKey||e.metaKey)||lassoMode){
+    // Ctrl+drag OR lasso mode — defer rubber-band until mouse moves
+    e.preventDefault();
+    clearSelection();hideProps();
+    const p=clientToCanvas(e.clientX,e.clientY);
+    rbStart=p;
+    dragging={kind:'rb-pending',startX:e.clientX,startY:e.clientY};
+    return;
+  }
+
+  if(!drawMode){
+    // Plain left-drag = pan
+    panning=true; panStartX=e.clientX; panStartY=e.clientY;
+    panStartPanX=panX; panStartPanY=panY;
+    document.getElementById('canvas-wrap').style.cursor='grabbing';
+  }
+}
+
+// ── Props panel ───────────────────────────────────────────────────────────────
+const PORTFOLIO_OPTIONS=['Backoffice','Commercial','Operations','Tech'];
+const TECH_FLAG_OPTIONS=['ALPS Usage','API Integration Usage','App Library Only','Automic Batch Scheduling Usage','Azure EAI?','Build DR in CHI CoLo','CICD','DB Integration Flag','DC HW Appliance','Day 1 Non Prod ATL?','Day 1 Non Prod LAS?','Day 1 Non-Prod WTC?','Day 1 Prod ATL?','Day 1 Prod LAS?','Day 1 Prod WTC?','Deployed in Service Centers','DynaTrace Adoption Needed','ENS/NDS Usage','EUC Software','FASTR Needed','Freight Data Warehouse (Oracle) Connectivity','Freight Data Warehouse (Synapse) Connectivity','Java/WebLogic Usage','Migration from FedexNet - EDI','Migration from FedexNet - MFT','Migration to DigiCert for PKI','Migration to FedEx Freight Network','Migration to Freight Software Licenses','Migration to RedOkta App to App','No HW as of 6/1/26','PCF Usage','RefArch EAI','SDLC Remediation Needed','SaaS-Hosted?','Storage (Fileshare, S3)','TIBCO AS / BE / BW Usage','TIBCO JMS / MQ7 Usage','VMWare'];
+
+// Build a multi-select checkbox dropdown and wire it to a node field
+function buildMultiSelect(containerId, fieldName, options, currentVals){
+  const container=document.getElementById(containerId);
+  if(!container)return;
+  const selected=new Set(Array.isArray(currentVals)?currentVals:[]);
+
+  const trigger=document.createElement('div');
+  trigger.className='ms-trigger';
+  const valSpan=document.createElement('span');
+  valSpan.className='ms-trigger-val'+(selected.size===0?' placeholder':'');
+  valSpan.textContent=selected.size===0?'None selected':[...selected].join(', ');
+  const chev=document.createElement('span');
+  chev.className='ms-chevron';chev.textContent='▼';
+  trigger.appendChild(valSpan);trigger.appendChild(chev);
+
+  const dropdown=document.createElement('div');
+  dropdown.className='ms-dropdown';
+  options.forEach(opt=>{
+    const row=document.createElement('div');
+    row.className='ms-option';
+    const cb=document.createElement('input');
+    cb.type='checkbox';cb.id=containerId+'-'+opt;cb.checked=selected.has(opt);
+    const lbl=document.createElement('label');
+    lbl.htmlFor=cb.id;lbl.textContent=opt;
+    cb.addEventListener('change',()=>{
+      if(cb.checked)selected.add(opt);else selected.delete(opt);
+      const arr=[...selected];
+      valSpan.textContent=arr.length===0?'None selected':arr.join(', ');
+      valSpan.className='ms-trigger-val'+(arr.length===0?' placeholder':'');
+      if(selNode){nodes[selNode][fieldName]=arr;renderNode(nodes[selNode],true);}
+    });
+    row.appendChild(cb);row.appendChild(lbl);
+    dropdown.appendChild(row);
+  });
+
+  // Clicks inside the dropdown stay inside — don't bubble to document close handler
+  dropdown.addEventListener('click',e=>e.stopPropagation());
+
+  trigger.addEventListener('click',e=>{
+    e.stopPropagation();
+    const isOpen=dropdown.classList.contains('open');
+    // close all other open dropdowns
+    document.querySelectorAll('.ms-dropdown.open').forEach(d=>{ d.classList.remove('open'); d.previousSibling?.classList.remove('open'); d.previousSibling?.querySelector('.ms-chevron')?.classList.remove('open'); });
+    if(!isOpen){ dropdown.classList.add('open'); trigger.classList.add('open'); chev.classList.add('open'); }
+  });
+
+  const wrap=document.createElement('div');
+  wrap.className='ms-wrap';
+  wrap.appendChild(trigger);wrap.appendChild(dropdown);
+  container.appendChild(wrap);
+}
+
+function showNodeProps(id){
+  const node=nodes[id];
+  const nt=getType(node.type);
+  currentTab='props';
+  document.querySelectorAll('.panel-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-props').classList.add('active');
+  document.getElementById('panel-list').style.display='none';
+  const pp=document.getElementById('panel-props');
+  pp.style.display='block';
+
+  const swatches=PALETTE.map(c=>`<div class="csw${node.color===c?' sel':''}" style="background:${c}" data-color="${c}"></div>`).join('');
+  pp.innerHTML=`
+    <div class="pg"><div class="pl">Label</div><input id="pp-label" class="pi" value="${esc(node.label)}"></div>
+    <div class="pg"><div class="pl">Description</div><textarea id="pp-sub" class="pta" placeholder="Short description…">${esc(node.subtitle)}</textarea></div>
+    <div class="pg"><div class="pl">Portfolio</div><div id="pp-portfolio-wrap"></div></div>
+    <div class="pg"><div class="pl">EAI</div><input id="pp-eai" class="pi" value="${esc(node.eai||'')}" placeholder="EAI identifier…"></div>
+    <div class="pg"><div class="pl">COE 1 Date</div><input id="pp-coe1" class="pi" type="date" value="${esc(node.coe1||'')}"></div>
+    <div class="pg"><div class="pl">COE 2 Date</div><input id="pp-coe2" class="pi" type="date" value="${esc(node.coe2||'')}"></div>
+    <div class="pg"><div class="pl">Tech Flag(s)</div><div id="pp-techflags-wrap"></div></div>
+    <div class="pg"><div class="pl">Color</div><div class="cr" id="pp-colors">${swatches}</div></div>
+    <div class="pg"><button class="sbtn" onclick="openEditTypeModal('${node.type}')">✎ Edit type "${esc(nt?nt.label:'')}"</button>
+    <button class="sbtn" onclick="duplicateNode('${id}')">⧉ Duplicate node</button>
+    <button class="dbtn" onclick="deleteNode('${id}')">Delete node</button></div>`;
+
+  buildMultiSelect('pp-portfolio-wrap','portfolio',PORTFOLIO_OPTIONS,node.portfolio);
+  buildMultiSelect('pp-techflags-wrap','techFlags',TECH_FLAG_OPTIONS,node.techFlags);
+
+  document.getElementById('pp-label').addEventListener('input',function(){
+    if(selNode){nodes[selNode].label=this.value;updateNodeTitle(selNode);}
+  });
+  document.getElementById('pp-sub').addEventListener('input',function(){
+    if(selNode){nodes[selNode].subtitle=this.value;renderNode(nodes[selNode],true);redrawEdges();
+      const ta=document.getElementById('pp-sub');if(ta){ta.focus();const l=ta.value.length;ta.setSelectionRange(l,l);}}
+  });
+  document.getElementById('pp-eai').addEventListener('input',function(){
+    if(selNode){nodes[selNode].eai=this.value;renderNode(nodes[selNode],true);
+      const i=document.getElementById('pp-eai');if(i){i.focus();const l=i.value.length;i.setSelectionRange(l,l);}}
+  });
+  document.getElementById('pp-coe1').addEventListener('change',function(){
+    if(selNode){nodes[selNode].coe1=this.value;renderNode(nodes[selNode],true);}
+  });
+  document.getElementById('pp-coe2').addEventListener('change',function(){
+    if(selNode){nodes[selNode].coe2=this.value;renderNode(nodes[selNode],true);}
+  });
+  document.getElementById('pp-colors').addEventListener('click',e=>{
+    const sw=e.target.closest('.csw');if(!sw||!selNode)return;
+    nodes[selNode].color=sw.dataset.color;
+    renderNode(nodes[selNode],true);redrawEdges();
+    document.querySelectorAll('#pp-colors .csw').forEach(s=>s.classList.toggle('sel',s.dataset.color===sw.dataset.color));
+  });
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click',()=>{
+  document.querySelectorAll('.ms-dropdown.open').forEach(d=>{
+    d.classList.remove('open');
+    const t=d.previousSibling;
+    if(t){t.classList.remove('open');t.querySelector('.ms-chevron')?.classList.remove('open');}
+  });
+});
+function hideProps(){
+  document.getElementById('panel-props').style.display='none';
+  document.getElementById('panel-list').style.display='';
+  currentTab='apps';
+  document.querySelectorAll('.panel-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-apps').classList.add('active');
+  renderAppsTab();
+}
+function deleteNode(id){
+  pushUndo();
+  edges=edges.filter(e=>e.from!==id&&e.to!==id);
+  document.getElementById(id)?.remove();delete nodes[id];
+  selNode=null;hideProps();redrawEdges();
+  if(cpNodeId===id)closeConnPopup();
+  if(!Object.keys(nodes).length&&!shapes.length&&!texts.length)document.getElementById('empty-state').style.display='';
+}
+function duplicateNode(id){
+  const src=nodes[id];if(!src)return;
+  const offset=24; // stagger the copy so it's clearly separate
+  const newId=createNode(src.type,src.x+offset,src.y+offset,{
+    label:src.label+' (copy)',
+    subtitle:src.subtitle,
+    color:src.color,
+    eai:src.eai,
+    portfolio:[...(src.portfolio||[])],
+    techFlags:[...(src.techFlags||[])],
+    w:src.w,
+    h:src.h,
+  });
+  document.getElementById('empty-state').style.display='none';
+  // createNode already calls selectNode, so the new node is selected & props shown
+}
+
+// ── Draw tools ────────────────────────────────────────────────────────────────
+function setDrawMode(mode){
+  if(drawMode===mode){clearDrawMode();return;}
+  drawMode=mode;
+  ['rect','ellipse','arrow','text'].forEach(m=>document.getElementById('btn-draw-'+m)?.classList.remove('active'));
+  document.getElementById('btn-draw-'+mode)?.classList.add('active');
+  const dl=document.getElementById('draw-layer');
+  if(mode==='text'){
+    // text: just click to place
+    dl.style.pointerEvents='all';dl.style.cursor='text';
+    document.getElementById('mode-label').textContent='Click on canvas to place text';
+  } else {
+    dl.style.pointerEvents='all';dl.style.cursor='crosshair';
+    document.getElementById('mode-label').textContent=`Draw ${mode} — click and drag`;
+  }
+}
+function clearDrawMode(){
+  drawMode=null;drawStart=null;drawPreview=null;
+  ['rect','ellipse','arrow','text'].forEach(m=>document.getElementById('btn-draw-'+m)?.classList.remove('active'));
+  const dl=document.getElementById('draw-layer');
+  dl.style.pointerEvents='none';dl.style.cursor='default';
+  document.getElementById('mode-label').textContent='Select mode';
+}
+function canvasPos(e){ return clientToCanvas(e.clientX,e.clientY); }
+function onDrawStart(e){
+  if(!drawMode)return;
+  e.stopPropagation();
+  const p=canvasPos(e);
+  if(drawMode==='text'){
+    placeText(p.x,p.y);clearDrawMode();return;
+  }
+  drawStart=p;
+  // create preview element
+  const svg=document.getElementById('draw-layer');
+  if(drawPreview){svg.removeChild(drawPreview);drawPreview=null;}
+  const ns='http://www.w3.org/2000/svg';
+  if(drawMode==='rect'){
+    drawPreview=document.createElementNS(ns,'rect');
+    drawPreview.setAttribute('fill','rgba(91,76,245,.08)');
+    drawPreview.setAttribute('stroke','#5B4CF5');drawPreview.setAttribute('stroke-width','1.5');
+    drawPreview.setAttribute('rx','4');drawPreview.setAttribute('stroke-dasharray','5 3');
+  } else if(drawMode==='ellipse'){
+    drawPreview=document.createElementNS(ns,'ellipse');
+    drawPreview.setAttribute('fill','rgba(91,76,245,.08)');
+    drawPreview.setAttribute('stroke','#5B4CF5');drawPreview.setAttribute('stroke-width','1.5');
+    drawPreview.setAttribute('stroke-dasharray','5 3');
+  } else if(drawMode==='arrow'){
+    drawPreview=document.createElementNS(ns,'line');
+    drawPreview.setAttribute('stroke','#374151');drawPreview.setAttribute('stroke-width','2');
+    drawPreview.setAttribute('marker-end','url(#ah-draw)');
+  }
+  if(drawPreview)svg.appendChild(drawPreview);
+}
+function onDrawMove(e){
+  if(!drawStart||!drawPreview)return;
+  const p=canvasPos(e);
+  const x1=drawStart.x*scale,y1=drawStart.y*scale,x2=p.x*scale,y2=p.y*scale;
+  if(drawMode==='rect'){
+    drawPreview.setAttribute('x',Math.min(x1,x2));drawPreview.setAttribute('y',Math.min(y1,y2));
+    drawPreview.setAttribute('width',Math.abs(x2-x1));drawPreview.setAttribute('height',Math.abs(y2-y1));
+  } else if(drawMode==='ellipse'){
+    drawPreview.setAttribute('cx',(x1+x2)/2);drawPreview.setAttribute('cy',(y1+y2)/2);
+    drawPreview.setAttribute('rx',Math.abs(x2-x1)/2);drawPreview.setAttribute('ry',Math.abs(y2-y1)/2);
+  } else if(drawMode==='arrow'){
+    drawPreview.setAttribute('x1',x1);drawPreview.setAttribute('y1',y1);
+    drawPreview.setAttribute('x2',x2);drawPreview.setAttribute('y2',y2);
+  }
+}
+function onDrawEnd(e){
+  if(!drawStart)return;
+  const p=canvasPos(e);
+  const dx=Math.abs(p.x-drawStart.x),dy=Math.abs(p.y-drawStart.y);
+  if(dx>4||dy>4){
+    const id='shape-'+(++shapeCounter);
+    const s={id,kind:drawMode,x:Math.min(drawStart.x,p.x),y:Math.min(drawStart.y,p.y),
+             w:Math.abs(p.x-drawStart.x),h:Math.abs(p.y-drawStart.y),
+             x1:drawStart.x,y1:drawStart.y,x2:p.x,y2:p.y};
+    pushUndo();
+    shapes.push(s);renderShapes();
+    document.getElementById('empty-state').style.display='none';
+  }
+  if(drawPreview){document.getElementById('draw-layer').removeChild(drawPreview);drawPreview=null;}
+  drawStart=null;
+  clearDrawMode();
+}
+function placeText(x,y){
+  pushUndo();
+  const id='text-'+(++shapeCounter);
+  texts.push({id,x,y,content:'Text'});
+  renderTexts();
+  document.getElementById('empty-state').style.display='none';
+  setTimeout(()=>{
+    const el=document.querySelector(`.ctextblock[data-id="${id}"]`);
+    if(el){
+      el.classList.add('selected');
+      const inner=el.querySelector('.ctextblock-inner');
+      const t=texts.find(t=>t.id===id);
+      if(inner&&t) enterTextEdit(inner,t);
+    }
+  },30);
+}
+function deleteShape(id){
+  pushUndo();
+  shapes=shapes.filter(s=>s.id!==id);
+  document.querySelector(`.cshape[data-id="${id}"]`)?.remove();
+  if(!Object.keys(nodes).length&&!shapes.length&&!texts.length)document.getElementById('empty-state').style.display='';
+}
+
+function renderShapes(){
+  const sl=document.getElementById('shapes-layer');
+  sl.style.pointerEvents='all';
+  shapes.forEach(s=>{
+    let el=sl.querySelector(`.cshape[data-id="${s.id}"]`);
+    if(!el){
+      el=document.createElement('div');el.className='cshape';el.dataset.id=s.id;
+
+      // Delete button
+      const delBtn=document.createElement('button');
+      delBtn.className='cshape-del';delBtn.title='Delete shape';delBtn.textContent='×';
+      delBtn.addEventListener('click',e=>{e.stopPropagation();deleteShape(s.id);});
+      el.appendChild(delBtn);
+
+      el.addEventListener('mousedown',e=>{
+        if(e.target===delBtn)return;
+        e.stopPropagation();
+        if(e.ctrlKey||e.metaKey){
+          // Ctrl+click: toggle just this shape, leave nodes alone
+          if(el.classList.contains('selected')){
+            el.classList.remove('selected');
+          } else {
+            el.classList.add('selected');
+          }
+          return;
+        }
+        // If this shape is already selected and there are other selected items, start group drag
+        const selShapes=document.querySelectorAll('.cshape.selected,.ctextblock.selected');
+        const hasGroup=selNodes.size>0||(el.classList.contains('selected')&&selShapes.length>1);
+        if(hasGroup&&el.classList.contains('selected')){
+          startGroupDrag(e);
+        } else {
+          clearSelection();
+          el.classList.add('selected');
+          startShapeDrag(e,s.id,'shape');
+        }
+      });
+      sl.appendChild(el);
+    }
+    // shapes-layer is now inside #canvas, so use raw canvas coords
+    el.style.left=s.x+'px'; el.style.top=s.y+'px';
+    el.style.width=s.w+'px'; el.style.height=s.h+'px';
+    const ns='http://www.w3.org/2000/svg';
+    let inner='';
+    if(s.kind==='rect'){
+      inner=`<svg width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}" xmlns="${ns}"><rect x="1" y="1" width="${s.w-2}" height="${s.h-2}" rx="4" fill="rgba(91,76,245,.06)" stroke="#6b7280" stroke-width="1.5"/></svg>`;
+    } else if(s.kind==='ellipse'){
+      const rw=s.w/2,rh=s.h/2;
+      inner=`<svg width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}" xmlns="${ns}"><ellipse cx="${rw}" cy="${rh}" rx="${rw-1}" ry="${rh-1}" fill="rgba(91,76,245,.06)" stroke="#6b7280" stroke-width="1.5"/></svg>`;
+    } else if(s.kind==='arrow'){
+      const dx=s.x2-s.x1,dy=s.y2-s.y1;
+      inner=`<svg width="${s.w+20}" height="${s.h+20}" style="overflow:visible" xmlns="${ns}">
+        <defs><marker id="shArr${s.id}" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#374151"/></marker></defs>
+        <line x1="${dx<0?s.w:0}" y1="${dy<0?s.h:0}" x2="${dx<0?0:s.w}" y2="${dy<0?0:s.h}" stroke="#374151" stroke-width="2" marker-end="url(#shArr${s.id})"/></svg>`;
+    }
+    // Rebuild ring content (keep del button)
+    let ring=el.querySelector('.shape-sel-ring');
+    if(!ring){ring=document.createElement('div');ring.className='shape-sel-ring';ring.style.cssText='width:100%;height:100%;position:relative';el.appendChild(ring);}
+    ring.innerHTML=inner;
+  });
+}
+function deleteTextBlock(id){
+  pushUndo();
+  texts=texts.filter(t=>t.id!==id);
+  document.querySelector(`.ctextblock[data-id="${id}"]`)?.remove();
+  if(!Object.keys(nodes).length&&!shapes.length&&!texts.length)document.getElementById('empty-state').style.display='';
+}
+
+function renderTexts(){
+  const sl=document.getElementById('shapes-layer');
+  texts.forEach(t=>{
+    let el=sl.querySelector(`.ctextblock[data-id="${t.id}"]`);
+    if(!el){
+      el=document.createElement('div');el.className='ctextblock';el.dataset.id=t.id;
+      el.style.position='absolute';
+
+      // Delete button (shown when selected)
+      const delBtn=document.createElement('button');
+      delBtn.className='ctextblock-del';delBtn.title='Delete';delBtn.textContent='×';
+      delBtn.addEventListener('click',e=>{e.stopPropagation();deleteTextBlock(t.id);});
+      el.appendChild(delBtn);
+
+      // Text content area
+      const inner=document.createElement('div');
+      inner.className='ctextblock-inner';
+      inner.textContent=t.content;
+      el.appendChild(inner);
+
+      // Single click: select (not edit)
+      el.addEventListener('mousedown',e=>{
+        if(e.target===delBtn)return;
+        e.stopPropagation();
+        if(inner.classList.contains('editing'))return;
+        if(e.ctrlKey||e.metaKey){
+          // Ctrl+click: toggle just this text block, leave nodes alone
+          if(el.classList.contains('selected')){
+            el.classList.remove('selected');
+            exitTextEdit(inner,t);
+          } else {
+            el.classList.add('selected');
+          }
+          return;
+        }
+        // Normal click: if part of a group drag, move whole group
+        const selShapes2=document.querySelectorAll('.cshape.selected,.ctextblock.selected');
+        const hasGroup2=selNodes.size>0||(el.classList.contains('selected')&&selShapes2.length>1);
+        if(hasGroup2&&el.classList.contains('selected')){
+          startGroupDrag(e);
+        } else {
+          document.querySelectorAll('.ctextblock.selected').forEach(x=>{
+            if(x!==el){ x.classList.remove('selected'); exitTextEdit(x.querySelector('.ctextblock-inner'),texts.find(tt=>tt.id===x.dataset.id)); }
+          });
+          el.classList.add('selected');
+          startShapeDrag(e,t.id,'text');
+        }
+      });
+
+      // Double-click: enter edit mode
+      el.addEventListener('dblclick',e=>{
+        if(e.target===delBtn)return;
+        e.stopPropagation();
+        enterTextEdit(inner,t);
+      });
+
+      sl.appendChild(el);
+    }
+    el.style.left=t.x+'px'; el.style.top=t.y+'px';
+    const inner=el.querySelector('.ctextblock-inner');
+    if(inner&&!inner.classList.contains('editing')&&inner.textContent!==t.content) inner.textContent=t.content;
+    inner.style.fontSize='14px';
+  });
+}
+
+function enterTextEdit(inner,t){
+  inner.contentEditable='true';
+  inner.classList.add('editing');
+  inner.style.cursor='text';
+  inner.focus();
+  // cursor to end
+  const range=document.createRange();
+  range.selectNodeContents(inner);range.collapse(false);
+  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);
+
+  const onInput=()=>{ t.content=inner.textContent; };
+  const onKeydown=e=>{
+    if(e.key==='Escape'||e.key==='Enter'){e.preventDefault();inner.blur();}
+    e.stopPropagation();
+  };
+  inner.addEventListener('input',onInput);
+  inner.addEventListener('keydown',onKeydown);
+  inner.addEventListener('blur',()=>{
+    inner.removeEventListener('input',onInput);
+    inner.removeEventListener('keydown',onKeydown);
+    exitTextEdit(inner,t);
+  },{once:true});
+}
+
+function exitTextEdit(inner,t){
+  if(!inner)return;
+  inner.contentEditable='false';
+  inner.classList.remove('editing');
+  inner.style.cursor='move';
+  if(t) t.content=inner.textContent.trim()||t.content;
+}
+
+// ── Connect ───────────────────────────────────────────────────────────────────
+function toggleConnectMode(){connectMode?exitConnectMode():enterConnectModeToolbar();}
+function enterConnectModeToolbar(){
+  connectMode=true;connectFrom=null;
+  document.getElementById('btn-connect').classList.add('active');
+  document.getElementById('mode-label').textContent='Connect mode – click a ◉ port to start';
+  document.getElementById('connect-hint').textContent='Click the ◉ port on a node to begin';
+  document.getElementById('connect-hint').style.display='block';
+  document.querySelectorAll('.node').forEach(n=>n.classList.add('connect-target'));
+}
+function exitConnectMode(){
+  connectMode=false;connectFrom=null;
+  document.getElementById('btn-connect').classList.remove('active');
+  document.getElementById('mode-label').textContent='Select mode';
+  document.getElementById('connect-hint').style.display='none';
+  document.querySelectorAll('.node').forEach(n=>n.classList.remove('connect-target'));
+}
+function startConnect(fromId){
+  connectFrom=fromId;connectMode=true;
+  document.getElementById('btn-connect').classList.add('active');
+  document.getElementById('mode-label').textContent='Connect mode – click the target node';
+  document.getElementById('connect-hint').textContent='Now click any other node to connect';
+  document.getElementById('connect-hint').style.display='block';
+  document.querySelectorAll('.node').forEach(n=>{
+    n.classList.remove('connect-target');
+    if(n.id!==fromId) n.classList.add('connect-target');
+  });
+}
+function onConnectOverlayClick(){exitConnectMode();}
+function completeConnect(toId){
+  if(!connectFrom||connectFrom===toId){exitConnectMode();return;}
+  const fromId=connectFrom;exitConnectMode();
+  if(!edges.some(e=>e.from===fromId&&e.to===toId)){
+    pushUndo();
+    const eid='edge-'+(++edgeCounter);
+    edges.push({id:eid,from:fromId,to:toId,label:'',protocol:''});
+    redrawEdges();openEdgeModal(eid);
+  }
+}
+
+
+// ── Edge drawing ──────────────────────────────────────────────────────────────
+function nodeCenter(id){
+  const n=nodes[id],el=document.getElementById(id);if(!n||!el)return{x:0,y:0};
+  return{x:n.x+el.offsetWidth/2, y:n.y+el.offsetHeight/2};
+}
+function nodeEdgePt(fId,tId){
+  const n=nodes[fId],el=document.getElementById(fId);if(!n||!el)return{x:0,y:0};
+  const fc=nodeCenter(fId),tc=nodeCenter(tId);
+  const dx=tc.x-fc.x,dy=tc.y-fc.y,angle=Math.atan2(dy,dx);
+  const hw=el.offsetWidth/2,hh=el.offsetHeight/2;
+  const t=(Math.abs(Math.cos(angle))*hh<=Math.abs(Math.sin(angle))*hw)?hh/(Math.abs(Math.sin(angle))+1e-9):hw/(Math.abs(Math.cos(angle))+1e-9);
+  return{x:fc.x+t*Math.cos(angle),y:fc.y+t*Math.sin(angle)};
+}
+function redrawEdges(){
+  // If filters are active, delegate to filtered version
+  const anyActive=viewFilters.portfolio.size||viewFilters.eai.size||viewFilters.techFlags.size||viewFilters.coe.size;
+  if(anyActive){ applyViewFilters(); return; }
+  const layer=document.getElementById('edges-layer');
+  const ll=document.getElementById('edge-labels-layer');
+  layer.innerHTML='';ll.innerHTML='';
+  edges.forEach(edge=>{
+    const from=nodeEdgePt(edge.from,edge.to),to=nodeEdgePt(edge.to,edge.from);
+    const dx=to.x-from.x,dy=to.y-from.y,dist=Math.sqrt(dx*dx+dy*dy)+1e-9;
+    const curve=Math.min(60,dist*.3),nx=-dy/dist,ny=dx/dist;
+    const cx=((from.x+to.x)/2)+nx*curve,cy=((from.y+to.y)/2)+ny*curve;
+    const d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    const isSel=selEdge===edge.id;
+    const txt2=edge.label||edge.protocol||'+ label';
+
+    // Visible path only — no hit paths needed (we use mousemove hit-test instead)
+    const vis=document.createElementNS('http://www.w3.org/2000/svg','path');
+    vis.setAttribute('d',d);
+    vis.setAttribute('fill','none');
+    vis.setAttribute('stroke',isSel?'#5B4CF5':'#9ca3af');
+    vis.setAttribute('stroke-width',isSel?'2.5':'1.5');
+    vis.setAttribute('marker-end',`url(#${isSel?'ah-sel':'ah'})`);
+    vis.dataset.edgeId=edge.id;
+    layer.appendChild(vis);
+
+    // Label pill (clickable, inside edge-labels-layer which inherits canvas transform)
+    const lx=(from.x+2*cx+to.x)/4, ly=(from.y+2*cy+to.y)/4;
+    const wrap=document.createElement('div');
+    wrap.className='el-wrap';
+    wrap.style.left=lx+'px'; wrap.style.top=ly+'px';
+    wrap.style.pointerEvents='all'; wrap.style.zIndex='10';
+    const pill=document.createElement('div');
+    pill.className='el-pill'+(isSel?' sel':'');
+    pill.textContent=txt2.length>24?txt2.slice(0,24)+'…':txt2;
+    wrap.addEventListener('click',e=>{ e.stopPropagation(); openEdgeModal(edge.id); });
+    wrap.appendChild(pill); ll.appendChild(wrap);
+  });
+}
+
+// ── Edge hover via mousemove hit-testing ──────────────────────────────────────
+let hoveredEdgeId=null;
+function initEdgeHover(){
+  const cw=document.getElementById('canvas-wrap');
+  const hoverPill=document.getElementById('edge-pill-hover');
+
+  cw.addEventListener('mousemove',e=>{
+    if(dragging||resizing||rubberBanding||panning||connectMode||drawMode)return;
+    // Skip if over a node or UI element
+    const overNode=e.target.closest('.node,.el-wrap,.ibtn,.port,.resize-handle,.cshape,.ctextblock');
+    if(overNode){ clearEdgeHover(); return; }
+
+    const layer=document.getElementById('edges-layer');
+    const svgEl=document.getElementById('svg-layer');
+    const svgRect=svgEl.getBoundingClientRect();
+    // Convert mouse to SVG coordinate space (accounts for transform)
+    const mx=(e.clientX-svgRect.left)/scale;
+    const my=(e.clientY-svgRect.top)/scale;
+
+    let found=null;
+    const paths=layer.querySelectorAll('path');
+    for(const path of paths){
+      try{
+        // Use a temporary thick stroke for hit testing
+        const origSW=path.getAttribute('stroke-width');
+        path.setAttribute('stroke-width','12');
+        const pt=svgEl.createSVGPoint();
+        pt.x=mx; pt.y=my;
+        const hit=path.isPointInStroke(pt);
+        path.setAttribute('stroke-width',origSW);
+        if(hit){ found=path.dataset.edgeId; break; }
+      }catch(err){}
+    }
+
+    if(found!==hoveredEdgeId){
+      clearEdgeHover();
+      if(found){
+        hoveredEdgeId=found;
+        const path=layer.querySelector(`path[data-edge-id="${found}"]`);
+        if(path){
+          path.setAttribute('stroke','#6b7280');
+          path.setAttribute('stroke-width','2.5');
+          const edge=edges.find(e=>e.id===found);
+          hoverPill.textContent=edge?edge.label||edge.protocol||'+ label':'';
+          hoverPill.style.left=e.clientX+'px';
+          hoverPill.style.top=e.clientY+'px';
+          hoverPill.style.display='block';
+          cw.style.cursor='pointer';
+        }
+      }
+    } else if(found){
+      hoverPill.style.left=e.clientX+'px';
+      hoverPill.style.top=e.clientY+'px';
+    }
+  });
+
+  cw.addEventListener('mouseleave',()=>clearEdgeHover());
+
+  cw.addEventListener('click',e=>{
+    if(!hoveredEdgeId)return;
+    if(e.target.closest('.node,.el-wrap,.ibtn,.port,.resize-handle,.cshape,.ctextblock'))return;
+    const eid=hoveredEdgeId;
+    clearEdgeHover();
+    openEdgeModal(eid);
+  });
+}
+
+function clearEdgeHover(){
+  const hoverPill=document.getElementById('edge-pill-hover');
+  if(hoveredEdgeId){
+    const path=document.querySelector(`#edges-layer path[data-edge-id="${hoveredEdgeId}"]`);
+    if(path){
+      const isSel=selEdge===hoveredEdgeId;
+      path.setAttribute('stroke',isSel?'#5B4CF5':'#9ca3af');
+      path.setAttribute('stroke-width',isSel?'2.5':'1.5');
+    }
+    hoveredEdgeId=null;
+  }
+  hoverPill.style.display='none';
+  document.getElementById('canvas-wrap').style.cursor='crosshair';
+}
+
+// ── Edge modal ────────────────────────────────────────────────────────────────
+function openEdgeModal(eid){
+  editEdgeId=eid;selEdge=eid;
+  const edge=edges.find(e=>e.id===eid);if(!edge)return;
+  document.getElementById('em-label').value=edge.label||'';
+  updateProtocolDatalist();
+  document.getElementById('em-proto').value=edge.protocol||'';
+  document.getElementById('edge-modal').style.display='flex';redrawEdges();
+  // Wire up proto input focus/blur after modal is visible
+  const protoInp=document.getElementById('em-proto');
+  protoInp.onfocus=()=>openProtoDropdown(protoInp.value, protoInp);
+  protoInp.onblur=()=>setTimeout(closeProtoDropdown,150);
+}
+function closeEdgeModal(){document.getElementById('edge-modal').style.display='none';closeProtoDropdown();editEdgeId=null;selEdge=null;redrawEdges();}
+function saveEdge(){
+  pushUndo();
+  const edge=edges.find(e=>e.id===editEdgeId);
+  if(edge){
+    edge.label=document.getElementById('em-label').value.trim();
+    const protoVal=document.getElementById('em-proto').value.trim();
+    edge.protocol=protoVal||connectionProtocols[0]||'';
+    if(protoVal&&!connectionProtocols.includes(protoVal)){
+      connectionProtocols.push(protoVal);
+      updateProtocolDatalist();
+    }
+  }
+  closeEdgeModal();
+}
+function deleteEdge(){
+  pushUndo();
+  edges=edges.filter(e=>e.id!==editEdgeId);
+  closeEdgeModal();
+}
+
+// ── Zoom ──────────────────────────────────────────────────────────────────────
+function zoom(d){scale=Math.min(3,Math.max(.2,scale+d));applyZoom();}
+function resetZoom(){scale=1;panX=0;panY=0;applyZoom();}
+function applyZoom(){
+  document.getElementById('zlabel').textContent=Math.round(scale*100)+'%';
+  applyCanvasTransform();
+  redrawEdges();
+}
+
+// ── Clear / Export ────────────────────────────────────────────────────────────
+async function clearAll(){
+  if(!Object.keys(nodes).length&&!edges.length&&!shapes.length&&!texts.length)return;
+  if(!await dlgConfirm('Clear the entire canvas? This cannot be undone.'))return;
+  Object.keys(nodes).forEach(id=>document.getElementById(id)?.remove());
+  document.getElementById('shapes-layer').innerHTML='';
+  nodes={};edges=[];shapes=[];texts=[];selNode=null;selNodes.clear();
+  nodeCounter=0;edgeCounter=0;shapeCounter=0;
+  document.getElementById('edges-layer').innerHTML='';
+  document.getElementById('edge-labels-layer').innerHTML='';
+  hideProps();closeConnPopup();
+  document.getElementById('empty-state').style.display='';
+}
+function exportSVG(){
+  if(!Object.keys(nodes).length&&!shapes.length&&!texts.length)return;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  Object.values(nodes).forEach(n=>{const el=document.getElementById(n.id);if(!el)return;
+    const nw=el.offsetWidth, nh=el.offsetHeight;
+    minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+nw);maxY=Math.max(maxY,n.y+nh);});
+  shapes.forEach(s=>{minX=Math.min(minX,s.x);minY=Math.min(minY,s.y);maxX=Math.max(maxX,s.x+s.w);maxY=Math.max(maxY,s.y+s.h);});
+  texts.forEach(t=>{minX=Math.min(minX,t.x);minY=Math.min(minY,t.y);maxX=Math.max(maxX,t.x+120);maxY=Math.max(maxY,t.y+30);});
+  if(minX===Infinity)return;
+  const pad=40,W=maxX-minX+pad*2,H=maxY-minY+pad*2;
+  const ns='http://www.w3.org/2000/svg';
+  let svg=`<svg xmlns="${ns}" width="${W}" height="${H}">
+<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#9ca3af"/></marker>
+<marker id="arr2" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#374151"/></marker></defs>
+<rect width="${W}" height="${H}" fill="#f0eff0"/>`;
+  // shapes
+  shapes.forEach(s=>{
+    const x=(s.x-minX+pad),y=(s.y-minY+pad);
+    if(s.kind==='rect')svg+=`<rect x="${x}" y="${y}" width="${s.w}" height="${s.h}" rx="4" fill="rgba(91,76,245,.06)" stroke="#6b7280" stroke-width="1.5"/>`;
+    else if(s.kind==='ellipse')svg+=`<ellipse cx="${x+s.w/2}" cy="${y+s.h/2}" rx="${s.w/2}" ry="${s.h/2}" fill="rgba(91,76,245,.06)" stroke="#6b7280" stroke-width="1.5"/>`;
+    else if(s.kind==='arrow')svg+=`<line x1="${(s.x1-minX+pad)}" y1="${(s.y1-minY+pad)}" x2="${(s.x2-minX+pad)}" y2="${(s.y2-minY+pad)}" stroke="#374151" stroke-width="2" marker-end="url(#arr2)"/>`;
+  });
+  texts.forEach(t=>{svg+=`<text x="${t.x-minX+pad}" y="${t.y-minY+pad+14}" font-size="14" fill="#1a191a" font-family="sans-serif">${esc(t.content)}</text>`;});
+  // edges
+  edges.forEach(edge=>{
+    const n1=nodes[edge.from],n2=nodes[edge.to];if(!n1||!n2)return;
+    const e1=document.getElementById(edge.from),e2=document.getElementById(edge.to);if(!e1||!e2)return;
+    const x1=(n1.x+e1.offsetWidth/scale/2)-minX+pad,y1=(n1.y+e1.offsetHeight/scale/2)-minY+pad;
+    const x2=(n2.x+e2.offsetWidth/scale/2)-minX+pad,y2=(n2.y+e2.offsetHeight/scale/2)-minY+pad;
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    svg+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#arr)"/>`;
+    const lbl=edge.label||edge.protocol;
+    if(lbl)svg+=`<rect x="${mx-52}" y="${my-10}" width="104" height="20" rx="4" fill="white" stroke="#d1d5db"/><text x="${mx}" y="${my+4}" text-anchor="middle" font-size="11" fill="#6b7280" font-family="sans-serif">${esc(lbl.slice(0,22))}</text>`;
+  });
+  // nodes
+  Object.values(nodes).forEach(n=>{
+    const el=document.getElementById(n.id);if(!el)return;
+    const nt=getType(n.type);
+    const nx=n.x-minX+pad,ny=n.y-minY+pad,w=el.offsetWidth,h=el.offsetHeight;
+    svg+=`<rect x="${nx}" y="${ny}" width="${w}" height="${h}" rx="10" fill="white" stroke="#e0dfe0"/>`;
+    svg+=`<rect x="${nx}" y="${ny}" width="${w}" height="44" rx="10" fill="${n.color}"/>`;
+    svg+=`<rect x="${nx}" y="${ny+28}" width="${w}" height="16" fill="${n.color}"/>`;
+    svg+=`<text x="${nx+50}" y="${ny+26}" font-size="12" font-weight="600" fill="#1a191a" font-family="sans-serif">${esc(n.label)}</text>`;
+    if(n.subtitle)svg+=`<text x="${nx+11}" y="${ny+55}" font-size="10" fill="#8a898a" font-family="sans-serif">${esc(n.subtitle.slice(0,32))}</text>`;
+    let yoff=n.subtitle?68:55;
+    if(n.eai){svg+=`<text x="${nx+11}" y="${ny+yoff}" font-size="9" fill="#6b7280" font-family="sans-serif"><tspan font-weight="bold">EAI: </tspan>${esc(n.eai.slice(0,28))}</text>`;yoff+=12;}
+    if(n.portfolio){svg+=`<text x="${nx+11}" y="${ny+yoff}" font-size="9" fill="#6b7280" font-family="sans-serif"><tspan font-weight="bold">Portfolio: </tspan>${esc(n.portfolio.slice(0,24))}</text>`;}
+  });
+  svg+='</svg>';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+  a.download='architecture-diagram.svg';a.click();
+}
+
+// ── Example ───────────────────────────────────────────────────────────────────
+function loadExample(){
+  clearAll();
+  setTimeout(()=>{
+    document.getElementById('empty-state').style.display='none';
+    const uid =createNode('user',   55,170,{label:'Web client',    subtitle:'React SPA',           color:'#e0f2fe',eai:'EAI-001',portfolio:['Commercial']});
+    const gw  =createNode('api',  290,170,{label:'API Gateway',   subtitle:'Auth + rate limiting', color:'#ede9fe',eai:'EAI-002',portfolio:['Tech']});
+    const auth=createNode('service',290,35,{label:'Auth service',  subtitle:'JWT / OAuth 2.0',     color:'#dcfce7',eai:'EAI-003',portfolio:['Tech']});
+    const ord =createNode('service',510,105,{label:'Orders API',   subtitle:'Business logic',       color:'#dcfce7',eai:'EAI-004',portfolio:['Commercial','Operations']});
+    const inv =createNode('service',510,245,{label:'Inventory API',subtitle:'Stock management',     color:'#dcfce7',eai:'EAI-005',portfolio:['Operations']});
+    const db  =createNode('db',    730,175,{label:'Postgres DB',   subtitle:'Primary datastore',    color:'#fef3c7',eai:'EAI-006',portfolio:['Backoffice']});
+    const q   =createNode('queue', 510,385,{label:'Event queue',   subtitle:'Kafka topics',          color:'#fce7f3',eai:'EAI-007',portfolio:['Tech']});
+    const notif=createNode('service',730,385,{label:'Notifications',subtitle:'Email / push',         color:'#dcfce7',eai:'EAI-008',portfolio:['Commercial']});
+    const ae=(f,t,l,p='REST / HTTP')=>{const eid='edge-'+(++edgeCounter);edges.push({id:eid,from:f,to:t,label:l,protocol:p});};
+    ae(uid,gw,  'HTTPS request');ae(gw,auth,'Bearer token');
+    ae(gw,ord,  'POST /orders + cart JSON');ae(gw,inv,'GET /stock/{sku}');
+    ae(ord,db,  'INSERT INTO orders','Database query');ae(inv,db,'UPDATE inventory SET qty','Database query');
+    ae(ord,q,   'order.placed { orderId, userId }','Message queue');ae(q,notif,'Consume order events','Message queue');
+    // add a rectangle grouping label
+    shapes.push({id:'shape-ex1',kind:'rect',x:270,y:10,w:270,h:310});
+    texts.push({id:'text-ex1',x:275,y:12,content:'Core services'});
+    renderShapes();renderTexts();
+    selectNode(null);hideProps();redrawEdges();
+  },50);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function copySelection(){
+  const ids=selNodes.size>0?[...selNodes]:(selNode?[selNode]:[]);
+  if(!ids.length)return;
+  clipboard=ids.map(id=>{const n=nodes[id];return{...n,portfolio:[...(n.portfolio||[])],techFlags:[...(n.techFlags||[])],coe1:n.coe1||'',coe2:n.coe2||''};});
+}
+
+function pasteClipboard(){
+  if(!clipboard.length)return;
+  const PASTE_OFFSET=40;
+  clearSelection();
+  const newIds=clipboard.map(src=>{
+    const id=createNode(src.type,snapPt(src.x+PASTE_OFFSET),snapPt(src.y+PASTE_OFFSET),{
+      label:src.label,subtitle:src.subtitle,color:src.color,
+      eai:src.eai,portfolio:[...(src.portfolio||[])],techFlags:[...(src.techFlags||[])],
+    coe1:src.coe1||'',coe2:src.coe2||'',
+      w:src.w,h:src.h,
+    });
+    return id;
+  });
+  // If multiple nodes pasted, switch to multi-select
+  if(newIds.length>1){
+    if(selNode){document.getElementById(selNode)?.classList.remove('selected');syncResizeHandles(selNode);selNode=null;hideProps();}
+    newIds.forEach(id=>{ selNodes.add(id); document.getElementById(id)?.classList.add('multi-sel'); });
+  }
+  document.getElementById('empty-state').style.display='none';
+}
+
+function onKeyDown(e){
+  if(e.key===' '&&!e.target.closest('input,textarea,[contenteditable]')){
+    e.preventDefault();spaceDown=true;
+    document.getElementById('canvas-wrap').style.cursor='grab';
+  }
+  if(e.key==='Escape'){
+    if(_mergePreview){cancelMergePreview();return;}
+    if(lassoMode){toggleLasso();return;}
+    exitConnectMode();closeEdgeModal();closeConnPopup();clearDrawMode();clearSelection();hideProps();
+  }
+  if((e.key==='Delete'||e.key==='Backspace')&&!e.target.closest('input,textarea,[contenteditable]')){
+    // Delete selected text blocks
+    const selTexts=document.querySelectorAll('.ctextblock.selected');
+    if(selTexts.length){ selTexts.forEach(el=>deleteTextBlock(el.dataset.id)); return; }
+    // Delete selected shapes
+    const selShapes=document.querySelectorAll('.cshape.selected');
+    if(selShapes.length){ selShapes.forEach(el=>deleteShape(el.dataset.id)); return; }
+    if(selNodes.size>0){
+      pushUndo();
+      const ids=[...selNodes];
+      ids.forEach(id=>{ edges=edges.filter(ev=>ev.from!==id&&ev.to!==id); document.getElementById(id)?.remove(); delete nodes[id]; });
+      selNodes.clear();hideProps();redrawEdges();
+      if(!Object.keys(nodes).length&&!shapes.length&&!texts.length)document.getElementById('empty-state').style.display='';
+    } else if(selNode){ deleteNode(selNode); }
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!e.target.closest('input,textarea,[contenteditable]')){
+    e.preventDefault(); popUndo(); return;
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='c'&&!e.target.closest('input,textarea,[contenteditable]')){
+    e.preventDefault();copySelection();
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='v'&&!e.target.closest('input,textarea,[contenteditable]')){
+    e.preventDefault();pasteClipboard();
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='d'&&selNode&&!e.target.closest('input,textarea,[contenteditable]')){
+    e.preventDefault();duplicateNode(selNode);
+  }
+  // Select all with Ctrl+A
+  if((e.ctrlKey||e.metaKey)&&e.key==='a'&&!e.target.closest('input,textarea,[contenteditable]')){
+    e.preventDefault();
+    clearSelection();
+    Object.keys(nodes).forEach(id=>{ selNodes.add(id); document.getElementById(id)?.classList.add('multi-sel'); });
+    hideProps();
+  }
+}
+
+// ── Per-node connection popup ─────────────────────────────────────────────────
+function cpSetView(v){
+  cpView=v;
+  document.getElementById('cp-vbtn-detail').classList.toggle('active',v==='detail');
+  document.getElementById('cp-vbtn-summary').classList.toggle('active',v==='summary');
+  renderCpBody();
+}
+function cpToggleType(typeId){
+  if(cpActiveTypes.has(typeId)) cpActiveTypes.delete(typeId);
+  else cpActiveTypes.add(typeId);
+  // update chip states
+  document.querySelectorAll('.cp-chip[data-f]').forEach(c=>{
+    c.classList.toggle('active', cpActiveTypes.has(c.dataset.f));
+  });
+  renderCpBody();
+}
+function cpToggleGroup(key){
+  cpExpanded[key]=!cpExpanded[key];
+  renderCpBody();
+}
+
+// ── Reachability BFS ──────────────────────────────────────────────────────────
+// Returns two Maps: outReach and incReach
+// outReach: nodeId → {hops, via:[nodeId,...], edgePath:[edgeId,...]}  (nodes reachable downstream)
+// incReach: nodeId → {hops, via:[nodeId,...], edgePath:[edgeId,...]}  (nodes that can reach this node upstream)
+function getReachability(startId){
+  // Single undirected BFS from startId — finds all reachable nodes regardless of edge direction.
+  // Then classifies each as outbound (reachable by following edges forward from startId)
+  // or inbound (reachable by following edges backward from startId).
+  // A node can appear in both if there are paths in both directions.
+
+  // Outbound BFS: follow edges in their forward direction
+  const outReach=new Map();
+  const outQ=[{id:startId,hops:0,via:[],edgePath:[]}];
+  const outSeen=new Set([startId]);
+  while(outQ.length){
+    const {id,hops,via,edgePath}=outQ.shift();
+    edges.filter(e=>e.from===id).forEach(edge=>{
+      if(!nodes[edge.to]||outSeen.has(edge.to))return;
+      outSeen.add(edge.to);
+      const entry={hops:hops+1,via:[...via,id],edgePath:[...edgePath,edge.id]};
+      outReach.set(edge.to,entry);
+      outQ.push({id:edge.to,...entry});
+    });
+    // Also traverse backward edges at hops>0 to pick up lateral connections
+    if(hops>0){
+      edges.filter(e=>e.to===id).forEach(edge=>{
+        if(!nodes[edge.from]||outSeen.has(edge.from))return;
+        outSeen.add(edge.from);
+        const entry={hops:hops+1,via:[...via,id],edgePath:[...edgePath,edge.id]};
+        outReach.set(edge.from,entry);
+        outQ.push({id:edge.from,...entry});
+      });
+    }
+  }
+
+  // Inbound BFS: follow edges in their backward direction
+  const incReach=new Map();
+  const incQ=[{id:startId,hops:0,via:[],edgePath:[]}];
+  const incSeen=new Set([startId]);
+  while(incQ.length){
+    const {id,hops,via,edgePath}=incQ.shift();
+    edges.filter(e=>e.to===id).forEach(edge=>{
+      if(!nodes[edge.from]||incSeen.has(edge.from))return;
+      incSeen.add(edge.from);
+      const entry={hops:hops+1,via:[...via,id],edgePath:[...edgePath,edge.id]};
+      incReach.set(edge.from,entry);
+      incQ.push({id:edge.from,...entry});
+    });
+    // Also traverse forward edges at hops>0 to pick up lateral connections
+    if(hops>0){
+      edges.filter(e=>e.from===id).forEach(edge=>{
+        if(!nodes[edge.to]||incSeen.has(edge.to))return;
+        incSeen.add(edge.to);
+        const entry={hops:hops+1,via:[...via,id],edgePath:[...edgePath,edge.id]};
+        incReach.set(edge.to,entry);
+        incQ.push({id:edge.to,...entry});
+      });
+    }
+  }
+
+  // Remove startId from both maps if it somehow ended up there
+  outReach.delete(startId);
+  incReach.delete(startId);
+
+  return{outReach,incReach};
+}
+
+function openConnPopup(nodeId, evt){
+  cpNodeId=nodeId;
+  const node=nodes[nodeId];
+  const nt=getType(node.type);
+
+  document.getElementById('cp-title').textContent=node.label;
+  document.getElementById('cp-subtitle').textContent=node.subtitle||(nt?nt.label:'');
+
+  let ahtml='';
+  if(node.eai)  ahtml+=`<div class="cp-attr"><div class="cp-attr-label">EAI</div><div class="cp-attr-val">${esc(node.eai)}</div></div>`;
+  if(node.portfolio&&node.portfolio.length) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">Portfolio</div><div class="cp-attr-val">${esc(node.portfolio.join(', '))}</div></div>`;
+  if(node.coe1) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">COE 1</div><div class="cp-attr-val">${esc(node.coe1)}</div></div>`;
+  if(node.coe2) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">COE 2</div><div class="cp-attr-val">${esc(node.coe2)}</div></div>`;
+  if(node.techFlags&&node.techFlags.length) ahtml+=`<div class="cp-attr" style="flex-basis:100%"><div class="cp-attr-label">Tech Flags</div><div class="cp-attr-val" style="white-space:normal;line-height:1.5">${esc(node.techFlags.join(' · '))}</div></div>`;
+  document.getElementById('cp-attrs').innerHTML=ahtml?`<div class="cp-attrs" style="flex-wrap:wrap">${ahtml}</div>`:'';
+
+  const {outReach,incReach}=getReachability(nodeId);
+  const hasConns=outReach.size||incReach.size;
+
+  document.getElementById('cp-toolbar').style.display=hasConns?'flex':'none';
+  document.getElementById('cp-filters').style.display=hasConns?'flex':'none';
+
+  if(hasConns){
+    // Build type groups to know which types exist
+    const typesSeen={};
+    const addEntry=(dir,otherId,meta)=>{
+      const other=nodes[otherId];if(!other)return;
+      const t=other.type;
+      if(!typesSeen[t])typesSeen[t]={type:t,out:[],inc:[]};
+      typesSeen[t][dir].push({other,...meta});
+    };
+    outReach.forEach((meta,id)=>addEntry('out',id,meta));
+    incReach.forEach((meta,id)=>addEntry('inc',id,meta));
+
+    // Default: show only the source node's own type; user can toggle others in
+    cpActiveTypes=new Set([node.type]);
+    // If source type has no connections, default to all types
+    if(!typesSeen[node.type]) cpActiveTypes=new Set(Object.keys(typesSeen));
+
+    // Build toggle chips — one per type present in reachability
+    let chips='';
+    Object.keys(typesSeen).forEach(tid=>{
+      const g=typesSeen[tid];
+      const cnt=g.out.length+g.inc.length;
+      const tnt=getType(tid);if(!tnt)return;
+      const isActive=cpActiveTypes.has(tid);
+      chips+=`<button class="cp-chip${isActive?' active':''}" data-f="${tid}" onclick="cpToggleType('${tid}')">${tnt.icon} ${esc(tnt.label)} (${cnt})</button>`;
+    });
+    document.getElementById('cp-filters').innerHTML=chips;
+  }
+
+  const popup=document.getElementById('conn-popup');
+  popup.classList.add('visible');
+  renderCpBody();
+  const br=evt.target.getBoundingClientRect(), pw=340;
+  let left=br.right+10, top=br.top;
+  const ph=Math.min(popup.scrollHeight||300, window.innerHeight*0.82);
+  if(left+pw>window.innerWidth-8) left=br.left-pw-8;
+  if(top+ph>window.innerHeight-8) top=window.innerHeight-ph-8;
+  popup.style.left=left+'px';
+  popup.style.top=Math.max(8,top)+'px';
+}
+
+function renderCpBody(){
+  const nodeId=cpNodeId;
+  if(!nodeId)return;
+  const body=document.getElementById('cp-body');
+
+  const {outReach,incReach}=getReachability(nodeId);
+
+  if(!outReach.size&&!incReach.size){
+    body.innerHTML='<div class="cpempty">No connections yet — use the ◉ port to connect.</div>';
+    return;
+  }
+
+  // Group by type
+  const groups={};
+  const addEntry=(dir,otherId,meta)=>{
+    const other=nodes[otherId];if(!other)return;
+    const t=other.type;
+    if(!groups[t])groups[t]={type:t,out:[],inc:[]};
+    groups[t][dir].push({other,...meta});
+  };
+  outReach.forEach((meta,id)=>addEntry('out',id,meta));
+  incReach.forEach((meta,id)=>addEntry('inc',id,meta));
+
+  const visibleGroups=cpActiveTypes.size===0
+    ? Object.values(groups)
+    : Object.values(groups).filter(g=>cpActiveTypes.has(g.type));
+
+  // Helper: render a hop-depth badge + via path
+  function hopLabel(hops,via){
+    if(hops===1) return '<span style="font-size:9px;color:var(--grn);font-weight:600;margin-left:4px">direct</span>';
+    const viaNames=via.slice(1).map(id=>nodes[id]?.label||id); // skip startId
+    const tip=viaNames.length?`via ${viaNames.join(' → ')}`:`${hops} hops`;
+    return `<span style="font-size:9px;color:var(--tx3);margin-left:4px" title="${esc(tip)}">${hops} hops</span>`;
+  }
+
+  // Helper: clicking an indirect connection opens the first direct edge in the path
+  function rowClick(edgePath){
+    if(!edgePath||!edgePath.length)return"closeConnPopup()";
+    return`openEdgeModal('${edgePath[0]}');closeConnPopup()`;
+  }
+
+  if(cpView==='summary'){
+    const maxConns=Math.max(...visibleGroups.map(g=>g.out.length+g.inc.length),1);
+    let html='';
+    visibleGroups.forEach(g=>{
+      const tnt=getType(g.type);if(!tnt)return;
+      const total=g.out.length+g.inc.length;
+      const directOut=g.out.filter(x=>x.hops===1).length;
+      const directIn=g.inc.filter(x=>x.hops===1).length;
+      const indirectOut=g.out.length-directOut;
+      const indirectIn=g.inc.length-directIn;
+      const pct=Math.round((total/maxConns)*100);
+      html+=`<div class="cp-sum-card" onclick="cpActiveTypes=new Set(['${g.type}']);cpSetView('detail')">
+        <div class="cp-group-icon" style="background:${tnt.color};color:${tnt.iconColor}">${tnt.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:12px;font-weight:600">${esc(tnt.label)}</span>
+            <span style="font-size:10px;color:var(--tx3)">${total} app${total!==1?'s':''}</span>
+          </div>
+          <div class="cp-sum-bar-wrap"><div class="cp-sum-bar" style="width:${pct}%;background:${tnt.iconColor}"></div></div>
+          <div style="font-size:9px;color:var(--tx3);margin-top:3px">
+            ↗ ${g.out.length} out (${directOut} direct${indirectOut?', '+indirectOut+' indirect':''}) ·
+            ↙ ${g.inc.length} in (${directIn} direct${indirectIn?', '+indirectIn+' indirect':''})
+          </div>
+        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--tx);min-width:20px;text-align:right">${total}</div>
+      </div>`;
+    });
+    if(!html) html='<div class="cpempty">No connections match this filter.</div>';
+    body.innerHTML=html;
+
+  } else {
+    let html='';
+    visibleGroups.forEach(g=>{
+      const tnt=getType(g.type);if(!tnt)return;
+      const total=g.out.length+g.inc.length;
+      const key=g.type;
+      const isOpen=cpExpanded[key]!==false;
+      const directOut=g.out.filter(x=>x.hops===1).length;
+      const directIn=g.inc.filter(x=>x.hops===1).length;
+      html+=`<div class="cp-group">
+        <div class="cp-group-hdr" onclick="cpToggleGroup('${key}')">
+          <div class="cp-group-icon" style="background:${tnt.color};color:${tnt.iconColor}">${tnt.icon}</div>
+          <div style="flex:1;min-width:0">
+            <div class="cp-group-name">${esc(tnt.label)}</div>
+            <div style="font-size:9px;color:var(--tx3);margin-top:1px">↗ ${g.out.length} out (${directOut} direct) · ↙ ${g.inc.length} in (${directIn} direct)</div>
+          </div>
+          <span class="cp-group-cnt">${total}</span>
+          <span class="cp-chev${isOpen?' open':''}">▶</span>
+        </div>
+        <div class="cp-group-body${isOpen?' open':''}">`;
+      // Sort: direct first, then by hop count
+      const sortByHops=(a,b)=>a.hops-b.hops;
+      [...g.out].sort(sortByHops).forEach(({other,hops,via,edgePath})=>{
+        html+=`<div class="cp-erow" onclick="${rowClick(edgePath)}">
+          <div class="cp-earr" style="color:${hops===1?'var(--ac)':'#a78bfa'}">${hops===1?'→':'⇢'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="cp-ename">${esc(other.label)}${hopLabel(hops,via)}</div>
+            ${other.subtitle?`<div class="cp-emeta">${esc(other.subtitle)}</div>`:''}
+          </div>
+        </div>`;
+      });
+      [...g.inc].sort(sortByHops).forEach(({other,hops,via,edgePath})=>{
+        html+=`<div class="cp-erow" onclick="${rowClick(edgePath)}">
+          <div class="cp-earr" style="color:${hops===1?'var(--grn)':'#6ee7b7'}">${hops===1?'←':'⇠'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="cp-ename">${esc(other.label)}${hopLabel(hops,via)}</div>
+            ${other.subtitle?`<div class="cp-emeta">${esc(other.subtitle)}</div>`:''}
+          </div>
+        </div>`;
+      });
+      html+=`</div></div>`;
+    });
+    if(!html) html='<div class="cpempty">No connections match this filter.</div>';
+    body.innerHTML=html;
+  }
+}
+
+function closeConnPopup(){
+  document.getElementById('conn-popup').classList.remove('visible');
+  cpNodeId=null;
+}
+
+function buildConnPopupData(){
+  const nodeId=cpNodeId;if(!nodeId)return null;
+  const node=nodes[nodeId];
+  const nt=getType(node.type);
+  const {outReach,incReach}=getReachability(nodeId);
+  const outList=[],incList=[];
+  outReach.forEach((meta,id)=>{
+    const other=nodes[id];if(!other)return;
+    outList.push({name:other.label,type:getType(other.type)?.label||other.type,hops:meta.hops,eai:other.eai||'',protocol:edges.find(e=>e.id===meta.edgePath[0])?.protocol||'',data:edges.find(e=>e.id===meta.edgePath[0])?.label||''});
+  });
+  incReach.forEach((meta,id)=>{
+    const other=nodes[id];if(!other)return;
+    incList.push({name:other.label,type:getType(other.type)?.label||other.type,hops:meta.hops,eai:other.eai||'',protocol:edges.find(e=>e.id===meta.edgePath[0])?.protocol||'',data:edges.find(e=>e.id===meta.edgePath[0])?.label||''});
+  });
+  return{
+    name:node.label, type:nt?.label||node.type, subtitle:node.subtitle||'',
+    eai:node.eai||'', portfolio:(node.portfolio||[]).join(', '),
+    coe1:node.coe1||'', coe2:node.coe2||'',
+    techFlags:(node.techFlags||[]).join(', '),
+    outbound:outList.sort((a,b)=>a.hops-b.hops),
+    inbound:incList.sort((a,b)=>a.hops-b.hops),
+    exportedAt:new Date().toISOString()
+  };
+}
+
+function exportConnPopupScreenshot(){
+  const popup=document.getElementById('conn-popup');
+  if(!popup||!popup.classList.contains('visible'))return;
+  const node=nodes[cpNodeId];
+  const filename=(node?node.label:'app').replace(/[^a-z0-9]/gi,'_')+'-summary.png';
+
+  // Temporarily expand the popup to show all content unclipped
+  const origMaxH=popup.style.maxHeight;
+  const origOverflow=popup.style.overflow;
+  popup.style.maxHeight='none';
+  popup.style.overflow='visible';
+
+  // Also expand the scroll area inside
+  const scrollEl=popup.querySelector('.cp-scroll');
+  const origScrollH=scrollEl?scrollEl.style.maxHeight:'';
+  const origScrollO=scrollEl?scrollEl.style.overflow:'';
+  if(scrollEl){scrollEl.style.maxHeight='none';scrollEl.style.overflow='visible';}
+
+  showSaveToast('Capturing…');
+
+  html2canvas(popup,{
+    backgroundColor:'#ffffff',
+    scale:2,
+    useCORS:true,
+    allowTaint:true,
+    scrollX:0,scrollY:0,
+    width:popup.offsetWidth,
+    height:popup.scrollHeight,
+    windowWidth:document.documentElement.scrollWidth,
+    windowHeight:document.documentElement.scrollHeight,
+  }).then(canvas=>{
+    // Restore popup styles
+    popup.style.maxHeight=origMaxH;
+    popup.style.overflow=origOverflow;
+    if(scrollEl){scrollEl.style.maxHeight=origScrollH;scrollEl.style.overflow=origScrollO;}
+
+    const a=document.createElement('a');
+    a.href=canvas.toDataURL('image/png');
+    a.download=filename;
+    a.click();
+    showSaveToast('Downloaded ✓');
+  }).catch(err=>{
+    popup.style.maxHeight=origMaxH;
+    popup.style.overflow=origOverflow;
+    if(scrollEl){scrollEl.style.maxHeight=origScrollH;scrollEl.style.overflow=origScrollO;}
+    console.error('Screenshot failed:',err);
+    showSaveToast('Screenshot failed');
+  });
+}
+
+// ── Bulk import from Excel ────────────────────────────────────────────────────
+function downloadImportTemplate(){
+  if(typeof XLSX==='undefined'){ showSaveToast('SheetJS not loaded yet'); return; }
+  const wb=XLSX.utils.book_new();
+
+  // ── Sheet 1: Update template ──
+  const data=[
+    ['EAI','Tech Flags (comma-separated)','COE 1 (YYYY-MM-DD)','COE 2 (YYYY-MM-DD)'],
+    ['EAI-001','CICD, VMWare','2026-09-01','2026-12-01'],
+    ['EAI-002','API Integration Usage','2026-10-15',''],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:20},{wch:50},{wch:18},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws,'App Updates');
+
+  // ── Sheet 2: Instructions ──
+  const instrData=[
+    ['ArchFlow Bulk Update — Instructions'],
+    [''],
+    ['1. Fill in the "App Updates" sheet — one row per application you want to update.'],
+    ['2. EAI must match exactly what is entered in the diagram node (case-sensitive).'],
+    ['3. Tech Flags: enter one or more flag names separated by commas.'],
+    ['   Copy flag names exactly from the "Valid Tech Flags" sheet.'],
+    ['   Example:  CICD, VMWare, API Integration Usage'],
+    ['4. COE dates: use YYYY-MM-DD format (e.g. 2026-09-15).'],
+    ['   Leave a cell blank to leave the existing value unchanged.'],
+    ['5. Tech Flags replace existing values on the node (they do not merge).'],
+    ['6. Upload the completed file via Settings tab → Bulk update from Excel in ArchFlow.'],
+    [''],
+    ['Columns explained:'],
+    ['  EAI             The EAI identifier of the application node to update.'],
+    ['  Tech Flags      Comma-separated list of tech flags to apply (replaces existing).'],
+    ['  COE 1           First COE event date in YYYY-MM-DD format.'],
+    ['  COE 2           Second COE event date in YYYY-MM-DD format.'],
+  ];
+  const wsInstr=XLSX.utils.aoa_to_sheet(instrData);
+  wsInstr['!cols']=[{wch:80}];
+  XLSX.utils.book_append_sheet(wb,wsInstr,'Instructions');
+
+  // ── Sheet 2: Valid Tech Flags ──
+  const flagData=[
+    ['Valid Tech Flags',''],
+    ['Copy these names exactly into the Tech Flags column on the App Updates sheet.',''],
+    ['Multiple flags: separate with a comma and space, e.g.:  CICD, VMWare',''],
+    ['',''],
+    ...TECH_FLAG_OPTIONS.map((f,i)=>[f,'']),
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(flagData);
+  ws2['!cols']=[{wch:45},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Valid Tech Flags');
+
+  // ── Sheet 3: Current EAIs in diagram ──
+  const eaiRows=[['EAI','App Name','Current Portfolio','Current Tech Flags','Current COE 1','Current COE 2']];
+  Object.values(nodes).filter(n=>n.eai).forEach(n=>{
+    eaiRows.push([
+      n.eai, n.label,
+      (n.portfolio||[]).join(', '),
+      (n.techFlags||[]).join(', '),
+      n.coe1||'', n.coe2||''
+    ]);
+  });
+  if(eaiRows.length===1) eaiRows.push(['(No nodes with EAI found in diagram)','','','','','']);
+  const ws3=XLSX.utils.aoa_to_sheet(eaiRows);
+  ws3['!cols']=[{wch:16},{wch:22},{wch:20},{wch:40},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Current Diagram EAIs');
+
+  XLSX.writeFile(wb,'archflow-update-template.xlsx');
+  showSaveToast('Template downloaded ✓');
+}
+
+function bulkImportFromFile(e){
+  const file=e.target.files[0];if(!file)return;
+  if(typeof XLSX==='undefined'){ showSaveToast('SheetJS not loaded yet'); return; }
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=new Uint8Array(ev.target.result);
+      const wb=XLSX.read(data,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+
+      if(!rows.length){ showSaveToast('No data rows found'); return; }
+
+      // Normalise column names: lowercase, strip parenthetical suffixes, remove non-alphanumeric
+      const norm=k=>k.trim().toLowerCase().replace(/\s*\(.*?\)/g,'').replace(/[^a-z0-9]/g,'');
+      const colMap={};
+      Object.keys(rows[0]).forEach(k=>{ colMap[norm(k)]=k; });
+
+      const eaiCol=colMap['eai'];
+      const flagCol=colMap['techflags']||colMap['flags']||colMap['techflag'];
+      const coe1Col=colMap['coe1']||colMap['coedateone']||colMap['coefirst'];
+      const coe2Col=colMap['coe2']||colMap['coedatetwo']||colMap['coesecond'];
+
+      if(!eaiCol){
+        const found=Object.keys(rows[0]).join(', ');
+        showSaveToast('No "EAI" column found');
+        const resultDiv=document.getElementById('import-result');
+        if(resultDiv){resultDiv.style.display='block';resultDiv.style.color='var(--red)';resultDiv.innerHTML=`<strong>No EAI column found.</strong><br><span style="color:var(--tx3)">Columns detected: ${found}</span>`;}
+        return;
+      }
+
+      let updated=0, skipped=0;
+      const log=[];
+
+      rows.forEach(row=>{
+        const eaiVal=(row[eaiCol]||'').toString().trim();
+        if(!eaiVal)return;
+        // Find matching nodes by EAI
+        const matched=Object.values(nodes).filter(n=>(n.eai||'').trim()===eaiVal);
+        if(!matched.length){ skipped++; log.push(`⚠ No node for EAI: ${eaiVal}`); return; }
+        matched.forEach(node=>{
+          // Tech Flags: parse comma-separated, validate against known options
+          if(flagCol&&row[flagCol]!==undefined&&row[flagCol]!==''){
+            const raw=row[flagCol].toString();
+            const parsed=raw.split(',').map(f=>f.trim()).filter(Boolean);
+            // Keep only valid tech flags (and any custom ones); add unknown ones to the list
+            parsed.forEach(f=>{ if(!TECH_FLAG_OPTIONS.includes(f)) TECH_FLAG_OPTIONS.push(f); });
+            node.techFlags=parsed;
+          }
+          // COE 1
+          if(coe1Col&&row[coe1Col]!==undefined&&row[coe1Col]!==''){
+            const d=parseExcelDate(row[coe1Col]);
+            if(d) node.coe1=d;
+          }
+          // COE 2
+          if(coe2Col&&row[coe2Col]!==undefined&&row[coe2Col]!==''){
+            const d=parseExcelDate(row[coe2Col]);
+            if(d) node.coe2=d;
+          }
+          renderNode(node,true);
+          updated++;
+        });
+        log.push(`✓ Updated: ${eaiVal} (${matched.map(n=>n.label).join(', ')})`);
+      });
+
+      // Show result in settings panel
+      const resultDiv=document.getElementById('import-result');
+      if(resultDiv){
+        resultDiv.style.display='block';
+        resultDiv.style.color=updated?'var(--grn)':'var(--red)';
+        resultDiv.innerHTML=`<strong>${updated} node${updated!==1?'s':''} updated, ${skipped} EAI${skipped!==1?'s':''} not found</strong><br>`+log.slice(0,10).map(l=>`<span style="color:var(--tx3)">${l}</span>`).join('<br>')+(log.length>10?`<br><span style="color:var(--tx3)">…and ${log.length-10} more</span>`:'');
+      }
+      showSaveToast(`${updated} node${updated!==1?'s':''} updated ✓`);
+    }catch(err){
+      console.error('Bulk import error:',err);
+      showSaveToast('Import failed: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value=''; // reset so same file can be re-uploaded
+}
+
+function parseExcelDate(val){
+  if(!val)return'';
+  const s=val.toString().trim();
+  // Already ISO/date string like 2026-09-01
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  // MM/DD/YYYY
+  const md=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(md) return `${md[3]}-${md[1].padStart(2,'0')}-${md[2].padStart(2,'0')}`;
+  // Try Date parse
+  const d=new Date(s);
+  if(!isNaN(d)) return d.toISOString().slice(0,10);
+  return '';
+}
+function initFilterBar(){
+  buildFbDropdown('fb-portfolio-wrap','portfolio','Portfolio',PORTFOLIO_OPTIONS);
+  buildFbEaiDropdown();
+  buildFbDropdown('fb-techflags-wrap','techFlags','Tech Flags',TECH_FLAG_OPTIONS);
+  buildFbCoeDropdown();
+}
+
+function makeFbClearRow(count, onClear){
+  const cr=document.createElement('div');
+  cr.style.cssText='padding:6px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between';
+  cr.innerHTML=`<span style="font-size:11px;color:var(--tx3)">${count} selected</span>`;
+  const btn=document.createElement('button');
+  btn.textContent='✕ Clear';
+  btn.style.cssText='font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--red-l);color:var(--red);cursor:pointer';
+  btn.addEventListener('click',e=>{e.stopPropagation();onClear();});
+  cr.appendChild(btn);
+  return cr;
+}
+
+function buildFbDropdown(wrapperId, filterKey, label, options){
+  const wrap=document.getElementById(wrapperId);
+  wrap.innerHTML='';
+  const sel=viewFilters[filterKey];
+
+  const trigger=document.createElement('button');
+  trigger.className='fb-trigger'+(sel.size?' active':'');
+  trigger.innerHTML=label+(sel.size?' ('+sel.size+')':'')+' <span class="fb-chevron">▾</span>';
+
+  const dropdown=document.createElement('div');
+  dropdown.className='fb-dropdown';
+
+  // Clear this filter row (only shown when something is selected)
+  if(sel.size>0){
+    const clearRow=document.createElement('div');
+    clearRow.style.cssText='padding:6px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between';
+    clearRow.innerHTML=`<span style="font-size:11px;color:var(--tx3)">${sel.size} selected</span>`;
+    const clearBtn=document.createElement('button');
+    clearBtn.textContent='✕ Clear';
+    clearBtn.style.cssText='font-size:11px;padding:2px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--red-l);color:var(--red);cursor:pointer';
+    clearBtn.addEventListener('click',e=>{
+      e.stopPropagation();
+      sel.clear();
+      rebuildFbDropdown(wrapperId,filterKey,label,options);
+      applyViewFilters();
+      closeAllFbDropdowns();
+    });
+    clearRow.appendChild(clearBtn);
+    dropdown.appendChild(clearRow);
+  }
+
+  options.forEach(opt=>{
+    const row=document.createElement('div');row.className='fb-opt';
+    const cb=document.createElement('input');cb.type='checkbox';cb.id=`fb-${filterKey}-${opt}`;cb.checked=sel.has(opt);
+    const lbl=document.createElement('label');lbl.htmlFor=cb.id;lbl.textContent=opt;
+    cb.addEventListener('change',()=>{
+      if(cb.checked)sel.add(opt);else sel.delete(opt);
+      rebuildFbDropdown(wrapperId,filterKey,label,options);
+      applyViewFilters();
+    });
+    row.appendChild(cb);row.appendChild(lbl);dropdown.appendChild(row);
+  });
+  dropdown.addEventListener('click',e=>e.stopPropagation());
+  trigger.addEventListener('click',e=>{
+    e.stopPropagation();
+    const isOpen=dropdown.classList.contains('open');
+    closeAllFbDropdowns();
+    if(!isOpen){
+      const r=trigger.getBoundingClientRect();
+      dropdown.style.left=r.left+'px';
+      dropdown.style.top=(r.bottom+4)+'px';
+      dropdown.classList.add('open');
+      trigger.querySelector('.fb-chevron').classList.add('open');
+    }
+  });
+  wrap.addEventListener('click',e=>e.stopPropagation());
+  wrap.appendChild(trigger);wrap.appendChild(dropdown);
+}
+
+function buildFbEaiDropdown(){
+  // EAI options are dynamic — pulled from nodes currently on canvas
+  const wrap=document.getElementById('fb-eai-wrap');
+  wrap.innerHTML='';
+  const sel=viewFilters.eai;
+  const options=[...new Set(Object.values(nodes).map(n=>n.eai).filter(Boolean))].sort();
+
+  const trigger=document.createElement('button');
+  trigger.className='fb-trigger'+(sel.size?' active':'');
+  trigger.innerHTML='EAI'+(sel.size?' ('+sel.size+')':'')+' <span class="fb-chevron">▾</span>';
+
+  const dropdown=document.createElement('div');
+  dropdown.className='fb-dropdown';
+  if(sel.size>0) dropdown.appendChild(makeFbClearRow(sel.size,()=>{sel.clear();buildFbEaiDropdown();applyViewFilters();closeAllFbDropdowns();}));
+  if(!options.length){
+    const empty=document.createElement('div');empty.className='fb-opt';empty.style.color='var(--tx3)';empty.style.fontStyle='italic';empty.textContent='No EAI values on canvas';
+    dropdown.appendChild(empty);
+  }
+  options.forEach(opt=>{
+    const row=document.createElement('div');row.className='fb-opt';
+    const cb=document.createElement('input');cb.type='checkbox';cb.id=`fb-eai-${opt}`;cb.checked=sel.has(opt);
+    const lbl=document.createElement('label');lbl.htmlFor=cb.id;lbl.textContent=opt;
+    cb.addEventListener('change',()=>{
+      if(cb.checked)sel.add(opt);else sel.delete(opt);
+      buildFbEaiDropdown();applyViewFilters();
+      // Reopen dropdown after rebuild
+      const wr=document.getElementById('fb-eai-wrap');
+      const tr=wr.querySelector('.fb-trigger');const dd=wr.querySelector('.fb-dropdown');
+      if(tr&&dd){const r=tr.getBoundingClientRect();dd.style.left=r.left+'px';dd.style.top=(r.bottom+4)+'px';dd.classList.add('open');tr.querySelector('.fb-chevron')?.classList.add('open');}
+    });
+    row.appendChild(cb);row.appendChild(lbl);dropdown.appendChild(row);
+  });
+  dropdown.addEventListener('click',e=>e.stopPropagation());
+  trigger.addEventListener('click',e=>{
+    e.stopPropagation();
+    // Refresh options when opening (nodes may have changed)
+    const isOpen=dropdown.classList.contains('open');
+    closeAllFbDropdowns();
+    if(!isOpen){
+      buildFbEaiDropdown();
+      const newDropdown=document.querySelector('#fb-eai-wrap .fb-dropdown');
+      const newTrigger=document.querySelector('#fb-eai-wrap .fb-trigger');
+      if(newDropdown&&newTrigger){
+        const r=newTrigger.getBoundingClientRect();
+        newDropdown.style.left=r.left+'px';
+        newDropdown.style.top=(r.bottom+4)+'px';
+        newDropdown.classList.add('open');
+        newTrigger.querySelector('.fb-chevron')?.classList.add('open');
+      }
+    }
+  });
+  wrap.appendChild(trigger);wrap.appendChild(dropdown);
+}
+
+function buildFbCoeDropdown(){
+  const wrap=document.getElementById('fb-coe-wrap');
+  wrap.innerHTML='';
+  const sel=viewFilters.coe;
+  // Collect unique COE dates from all nodes
+  const dateSet=new Set();
+  Object.values(nodes).forEach(n=>{
+    if(n.coe1) dateSet.add(n.coe1);
+    if(n.coe2) dateSet.add(n.coe2);
+  });
+  const options=[...dateSet].sort();
+
+  const trigger=document.createElement('button');
+  trigger.className='fb-trigger'+(sel.size?' active':'');
+  trigger.innerHTML='COE Date'+(sel.size?' ('+sel.size+')':'')+' <span class="fb-chevron">▾</span>';
+
+  const dropdown=document.createElement('div');
+  dropdown.className='fb-dropdown';
+  if(sel.size>0) dropdown.appendChild(makeFbClearRow(sel.size,()=>{sel.clear();buildFbCoeDropdown();applyViewFilters();closeAllFbDropdowns();}));
+  if(!options.length){
+    const empty=document.createElement('div');empty.className='fb-opt';empty.style.color='var(--tx3)';empty.style.fontStyle='italic';empty.textContent='No COE dates on canvas';
+    dropdown.appendChild(empty);
+  }
+  options.forEach(opt=>{
+    const row=document.createElement('div');row.className='fb-opt';
+    const cb=document.createElement('input');cb.type='checkbox';cb.id=`fb-coe-${opt}`;cb.checked=sel.has(opt);
+    const lbl=document.createElement('label');lbl.htmlFor=cb.id;lbl.textContent=opt;
+    cb.addEventListener('change',()=>{
+      if(cb.checked)sel.add(opt);else sel.delete(opt);
+      buildFbCoeDropdown();applyViewFilters();
+      const wr=document.getElementById('fb-coe-wrap');
+      const tr=wr.querySelector('.fb-trigger');const dd=wr.querySelector('.fb-dropdown');
+      if(tr&&dd){const r=tr.getBoundingClientRect();dd.style.left=r.left+'px';dd.style.top=(r.bottom+4)+'px';dd.classList.add('open');tr.querySelector('.fb-chevron')?.classList.add('open');}
+    });
+    row.appendChild(cb);row.appendChild(lbl);dropdown.appendChild(row);
+  });
+  dropdown.addEventListener('click',e=>e.stopPropagation());
+  trigger.addEventListener('click',e=>{
+    e.stopPropagation();
+    const isOpen=dropdown.classList.contains('open');
+    closeAllFbDropdowns();
+    if(!isOpen){
+      buildFbCoeDropdown();
+      const newDropdown=document.querySelector('#fb-coe-wrap .fb-dropdown');
+      const newTrigger=document.querySelector('#fb-coe-wrap .fb-trigger');
+      if(newDropdown&&newTrigger){
+        const r=newTrigger.getBoundingClientRect();
+        newDropdown.style.left=r.left+'px';
+        newDropdown.style.top=(r.bottom+4)+'px';
+        newDropdown.classList.add('open');
+        newTrigger.querySelector('.fb-chevron')?.classList.add('open');
+      }
+    }
+  });
+  wrap.appendChild(trigger);wrap.appendChild(dropdown);
+}
+
+function rebuildFbDropdown(wrapperId,filterKey,label,options){
+  buildFbDropdown(wrapperId,filterKey,label,options);
+  // Reopen the dropdown so it stays visible after checking a box
+  const wrap=document.getElementById(wrapperId);
+  const trigger=wrap.querySelector('.fb-trigger');
+  const dropdown=wrap.querySelector('.fb-dropdown');
+  if(trigger&&dropdown){
+    const r=trigger.getBoundingClientRect();
+    dropdown.style.left=r.left+'px';
+    dropdown.style.top=(r.bottom+4)+'px';
+    dropdown.classList.add('open');
+    trigger.querySelector('.fb-chevron')?.classList.add('open');
+    trigger.classList.add('open');
+  }
+}
+
+function closeAllFbDropdowns(){
+  document.querySelectorAll('.fb-dropdown.open').forEach(d=>{d.classList.remove('open');});
+  document.querySelectorAll('.fb-chevron.open').forEach(c=>c.classList.remove('open'));
+}
+
+function clearViewFilters(){
+  viewFilters.portfolio.clear();viewFilters.eai.clear();viewFilters.techFlags.clear();viewFilters.coe.clear();
+  initFilterBar();applyViewFilters();
+}
+
+function applyViewFilters(){
+  const pf=viewFilters.portfolio, ef=viewFilters.eai, tf=viewFilters.techFlags, cf=viewFilters.coe;
+  const anyActive=pf.size||ef.size||tf.size||cf.size;
+
+  // Update clear button visibility
+  document.getElementById('fb-clear-btn').style.display=anyActive?'':'none';
+
+  if(!anyActive){
+    // No filters — show everything normally
+    document.querySelectorAll('.node').forEach(n=>{n.classList.remove('flt-hidden','flt-dim');});
+    document.getElementById('edges-layer').style.opacity='';
+    document.getElementById('edge-labels-layer').style.opacity='';
+    redrawEdges();
+    return;
+  }
+
+  // Determine which nodes pass each filter individually
+  const passing=new Set();
+  const portfolioOnly=new Set(); // passes portfolio but checked separately for dimming
+  Object.values(nodes).forEach(n=>{
+    const portfolioOk=!pf.size||[...(n.portfolio||[])].some(p=>pf.has(p));
+    const eaiOk=!ef.size||ef.has(n.eai||'');
+    const tfOk=!tf.size||[...(n.techFlags||[])].some(f=>tf.has(f));
+    const coeOk=!cf.size||cf.has(n.coe1||'')||cf.has(n.coe2||'');
+    if(portfolioOk&&eaiOk&&tfOk&&coeOk) passing.add(n.id);
+    if(portfolioOk) portfolioOnly.add(n.id);
+  });
+
+  // Apply visual states to nodes
+  // Portfolio-only filter: dim connected nodes that don't pass
+  // EAI / TechFlags filters: fully hide non-matching nodes (no dimming)
+  const portfolioFilterActive=pf.size>0;
+  const strictFiltersActive=ef.size>0||tf.size>0||cf.size>0;
+
+  Object.keys(nodes).forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.classList.remove('flt-hidden','flt-dim');
+    if(passing.has(id))return; // passes all — show normally
+
+    if(strictFiltersActive){
+      // EAI or TechFlags active — always fully hide non-passing nodes
+      el.classList.add('flt-hidden');
+    } else if(portfolioFilterActive){
+      // Portfolio only — dim if connected to a passing node, else hide
+      const connects=edges.some(e=>(e.from===id&&passing.has(e.to))||(e.to===id&&passing.has(e.from)));
+      if(connects) el.classList.add('flt-dim');
+      else el.classList.add('flt-hidden');
+    } else {
+      el.classList.add('flt-hidden');
+    }
+  });
+
+  // Re-draw edges with filter-aware opacity
+  redrawEdgesFiltered(passing);
+}
+
+function redrawEdgesFiltered(passing){
+  const layer=document.getElementById('edges-layer');
+  const ll=document.getElementById('edge-labels-layer');
+  layer.innerHTML='';ll.innerHTML='';
+  edges.forEach(edge=>{
+    const from=nodeEdgePt(edge.from,edge.to),to=nodeEdgePt(edge.to,edge.from);
+    const dx=to.x-from.x,dy=to.y-from.y,dist=Math.sqrt(dx*dx+dy*dy)+1e-9;
+    const curve=Math.min(60,dist*.3),nx=-dy/dist,ny=dx/dist;
+    const cx=((from.x+to.x)/2)+nx*curve,cy=((from.y+to.y)/2)+ny*curve;
+    const d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    const isSel=selEdge===edge.id;
+    const bothPass=passing.has(edge.from)&&passing.has(edge.to);
+    const eitherPass=passing.has(edge.from)||passing.has(edge.to);
+    const opacity=bothPass?1:eitherPass?0.18:0;
+    if(opacity===0)return;
+
+    const txt2=edge.label||edge.protocol||'+ label';
+    const vis=document.createElementNS('http://www.w3.org/2000/svg','path');
+    vis.setAttribute('d',d);vis.setAttribute('fill','none');
+    vis.setAttribute('stroke',bothPass?(isSel?'#5B4CF5':'#9ca3af'):'#d1d5db');
+    vis.setAttribute('stroke-width',isSel&&bothPass?'2.5':'1.5');
+    if(bothPass) vis.setAttribute('marker-end',`url(#${isSel?'ah-sel':'ah'})`);
+    vis.style.opacity=String(opacity);
+    if(bothPass) vis.dataset.edgeId=edge.id;
+    layer.appendChild(vis);
+
+    if(bothPass){
+      const lx=(from.x+2*cx+to.x)/4,ly=(from.y+2*cy+to.y)/4;
+      const wrap=document.createElement('div');wrap.className='el-wrap';wrap.style.left=lx+'px';wrap.style.top=ly+'px';wrap.style.pointerEvents='all';wrap.style.zIndex='10';
+      const pill=document.createElement('div');pill.className='el-pill'+(isSel?' sel':'');pill.textContent=txt2.length>24?txt2.slice(0,24)+'…':txt2;
+      wrap.addEventListener('click',e=>{e.stopPropagation();openEdgeModal(edge.id);});
+      wrap.appendChild(pill);ll.appendChild(wrap);
+    }
+  });
+}
+
+// ── Save / Load ───────────────────────────────────────────────────────────────
+const STORAGE_KEY='archflow_slots';
+
+function getSlots(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); }catch(e){ return []; }
+}
+function putSlots(slots){ localStorage.setItem(STORAGE_KEY, JSON.stringify(slots)); }
+
+function buildSnapshot(name){
+  return{
+    name: name||'Untitled',
+    savedAt: new Date().toISOString(),
+    version: 1,
+    state:{
+      nodes, edges, shapes, texts,
+      connectionProtocols, nodeTypes,
+      panX, panY, scale
+    }
+  };
+}
+
+function loadSnapshot(snap){
+  // Wipe current state
+  Object.keys(nodes).forEach(id=>document.getElementById(id)?.remove());
+  document.getElementById('shapes-layer').innerHTML='';
+  document.getElementById('edges-layer').innerHTML='';
+  document.getElementById('edge-labels-layer').innerHTML='';
+  nodes={}; edges=[]; shapes=[]; texts=[];
+  selNode=null; selNodes.clear(); selEdge=null;
+  nodeCounter=0; edgeCounter=0; shapeCounter=0;
+
+  const s=snap.state;
+  // Restore scale & pan
+  if(s.scale) scale=s.scale;
+  if(s.panX!=null) panX=s.panX;
+  if(s.panY!=null) panY=s.panY;
+  // Restore node types (custom ones)
+  if(s.nodeTypes) nodeTypes=s.nodeTypes;
+  // Restore protocols
+  if(s.connectionProtocols) connectionProtocols=s.connectionProtocols;
+  // Restore nodes
+  if(s.nodes){
+    const raw=s.nodes;
+    const keys=Array.isArray(raw)?raw.map(n=>n.id):Object.keys(raw);
+    const vals=Array.isArray(raw)?raw:Object.values(raw);
+    vals.forEach(n=>{
+      nodes[n.id]=n;
+      if(!n.w)n.w=160; if(!n.h)n.h=120;
+      if(!Array.isArray(n.portfolio))n.portfolio=n.portfolio?[n.portfolio]:[];
+      if(!Array.isArray(n.techFlags))n.techFlags=[];
+      if(!n.coe1)n.coe1=''; if(!n.coe2)n.coe2='';
+      nodeCounter=Math.max(nodeCounter,parseInt(n.id.replace('node-',''))||0);
+    });
+  }
+  // Restore edges
+  if(s.edges){ edges=s.edges; edges.forEach(e=>{ edgeCounter=Math.max(edgeCounter,parseInt(e.id.replace('edge-',''))||0); }); }
+  // Restore shapes & texts
+  if(s.shapes){ shapes=s.shapes; shapes.forEach(s=>{ shapeCounter=Math.max(shapeCounter,parseInt(s.id.replace('shape-','').replace('text-',''))||0); }); }
+  if(s.texts){ texts=s.texts; texts.forEach(t=>{ shapeCounter=Math.max(shapeCounter,parseInt(t.id.replace('text-','').replace('shape-',''))||0); }); }
+
+  // Re-render everything
+  Object.values(nodes).forEach(n=>renderNode(n,true));
+  renderShapes(); renderTexts();
+  applyCanvasTransform();
+  redrawEdges();
+  updateProtocolDatalist();
+  renderPanel();
+  initFilterBar();
+  document.getElementById('empty-state').style.display=Object.keys(nodes).length||shapes.length||texts.length?'none':'';
+}
+
+// ── Save to auto-slot (most recent) ──────────────────────────────────────────
+function saveToSlot(){
+  const slots=getSlots();
+  const name=slots.length?slots[0].name:'My diagram';
+  const snap=buildSnapshot(name);
+  slots.unshift(snap);
+  // Keep at most 20 slots
+  while(slots.length>20)slots.pop();
+  putSlots(slots);
+  showSaveToast('Saved ✓');
+}
+
+// ── Save as new named slot ────────────────────────────────────────────────────
+async function saveToNewSlot(){
+  const name=await dlgPrompt('Name this diagram:','My diagram '+(getSlots().length+1));
+  if(!name)return;
+  const slots=getSlots();
+  slots.unshift(buildSnapshot(name.trim()));
+  while(slots.length>20)slots.pop();
+  putSlots(slots);
+  showSaveToast('Saved as "'+name+'" ✓');
+  renderSlotsModal();
+}
+
+// ── Slots modal ───────────────────────────────────────────────────────────────
+function openSlotsModal(){
+  closeSaveMenu();
+  renderSlotsModal();
+  document.getElementById('slots-modal').style.display='flex';
+}
+function closeSlotsModal(){ document.getElementById('slots-modal').style.display='none'; }
+
+function renderSlotsModal(){
+  const slots=getSlots();
+  const list=document.getElementById('slots-list');
+  if(!slots.length){
+    list.innerHTML='<p style="font-size:12px;color:var(--tx3);padding:12px 0">No saved diagrams yet. Click "Save" in the toolbar to save your work.</p>';
+    return;
+  }
+  list.innerHTML='';
+  slots.forEach((slot,i)=>{
+    const row=document.createElement('div');row.className='slot-row';
+    const info=document.createElement('div');info.className='slot-name';
+    const nameEl=document.createElement('div');nameEl.className='slot-name-text';nameEl.textContent=slot.name;
+    nameEl.title='Click to rename';
+    nameEl.addEventListener('click',()=>{
+      const inp=document.createElement('input');
+      inp.value=slot.name;inp.style.cssText='width:100%;padding:2px 4px;border:1px solid var(--ac);border-radius:4px;font-size:13px;font-weight:500;font-family:inherit;outline:none';
+      nameEl.replaceWith(inp);inp.focus();inp.select();
+      const commit=()=>{
+        const v=inp.value.trim()||slot.name;
+        slots[i].name=v;putSlots(slots);renderSlotsModal();
+      };
+      inp.addEventListener('blur',commit);
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter')inp.blur(); if(e.key==='Escape'){inp.value=slot.name;inp.blur();} e.stopPropagation(); });
+    });
+    const meta=document.createElement('div');meta.className='slot-meta';
+    const d=new Date(slot.savedAt);
+    meta.textContent=isNaN(d)?'Unknown date':d.toLocaleString();
+    info.appendChild(nameEl);info.appendChild(meta);
+
+    const acts=document.createElement('div');acts.className='slot-act';
+    const loadBtn=document.createElement('button');loadBtn.className='slot-btn primary';loadBtn.textContent='Load';
+    loadBtn.addEventListener('click',()=>{
+      _pendingImportSnap=slot;
+      document.getElementById('icm-title').textContent='Load "'+slot.name+'"';
+      const nodeCount=Object.keys(slot.state.nodes||{}).length;
+      document.getElementById('icm-desc').textContent=
+        'This diagram contains '+nodeCount+' application'+(nodeCount!==1?'s':'')+'. How would you like to load it?';
+      document.getElementById('import-choice-modal').style.display='flex';
+      closeSlotsModal();
+    });
+    const overBtn=document.createElement('button');overBtn.className='slot-btn';overBtn.textContent='Overwrite';
+    overBtn.addEventListener('click',()=>{ (async()=>{if(await dlgConfirm('Overwrite "'+slot.name+'" with current diagram?')){slots[i]=buildSnapshot(slot.name);putSlots(slots);renderSlotsModal();showSaveToast('Overwritten ✓');}})() });
+    const dlBtn=document.createElement('button');dlBtn.className='slot-btn';dlBtn.title='Export this save as JSON';dlBtn.textContent='⬇';
+    dlBtn.addEventListener('click',()=>downloadJSON(slot,slot.name));
+    const delBtn=document.createElement('button');delBtn.className='slot-btn danger';delBtn.textContent='✕';
+    delBtn.addEventListener('click',()=>{ (async()=>{if(await dlgConfirm('Delete "'+slot.name+'"?')){slots.splice(i,1);putSlots(slots);renderSlotsModal();}})() });
+
+    acts.appendChild(loadBtn);acts.appendChild(overBtn);acts.appendChild(dlBtn);acts.appendChild(delBtn);
+    row.appendChild(info);row.appendChild(acts);
+    list.appendChild(row);
+  });
+}
+
+// ── Export / Import JSON ──────────────────────────────────────────────────────
+async function exportJSON(){
+  closeSaveMenu();
+  const name=await dlgPrompt('Name this export:','archflow-export');
+  if(name===null)return;
+  downloadJSON(buildSnapshot(name.trim()||'archflow-export'), name.trim()||'archflow-export');
+}
+function downloadJSON(snap, filename){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(snap,null,2)],{type:'application/json'}));
+  a.download=(filename||'archflow')+'.json';a.click();
+}
+let _pendingImportSnap=null;
+
+function importFromFile(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const snap=JSON.parse(ev.target.result);
+      if(!snap.state)throw new Error('Invalid file');
+      _pendingImportSnap=snap;
+      // Show choice modal
+      document.getElementById('icm-title').textContent='Import "'+snap.name+'"';
+      const nodeCount=Object.keys(snap.state.nodes||{}).length;
+      document.getElementById('icm-desc').textContent=
+        'This file contains '+nodeCount+' application'+(nodeCount!==1?'s':'')+'. How would you like to import it?';
+      document.getElementById('import-choice-modal').style.display='flex';
+    }catch(err){ dlgAlert('Could not read file: '+err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+// ── Merge / floating placement ────────────────────────────────────────────────
+let _mergePreview=null; // {snap, ghostIds, anchorX, anchorY, offsetX, offsetY}
+
+function icmChoose(mode){
+  document.getElementById('import-choice-modal').style.display='none';
+  const snap=_pendingImportSnap; _pendingImportSnap=null;
+  if(!snap)return;
+  if(mode==='replace'){
+    loadSnapshot(snap);
+    showSaveToast('Imported ✓');
+  } else {
+    startMergePreview(snap);
+  }
+}
+
+function startMergePreview(snap){
+  const s=snap.state;
+  if(!s)return;
+
+  // Merge node types and protocols silently
+  if(s.nodeTypes) s.nodeTypes.forEach(t=>{ if(!nodeTypes.find(x=>x.id===t.id)) nodeTypes.push(t); });
+  if(s.connectionProtocols) s.connectionProtocols.forEach(p=>{ if(!connectionProtocols.includes(p)) connectionProtocols.push(p); });
+
+  // Compute target anchor: 5 grid blocks right of furthest existing object
+  const GAP=5*GRID; // 200px in canvas units
+  const allX=Object.values(nodes).map(n=>n.x+(n.w||160));
+  Object.values(shapes||[]).forEach(sh=>allX.push(sh.x+(sh.w||0)));
+  const existingMaxX=allX.length?Math.max(...allX):0;
+  const anchorX=existingMaxX>0?existingMaxX+GAP:200;
+
+  // Top-most existing node Y (align top of import to top of existing content)
+  const allY=Object.values(nodes).map(n=>n.y);
+  const existingMinY=allY.length?Math.min(...allY):200;
+
+  // Compute bounding box of the imported content
+  const srcNodes=Array.isArray(s.nodes)?s.nodes:Object.values(s.nodes||{});
+  const importMinX=srcNodes.length?Math.min(...srcNodes.map(n=>n.x)):0;
+  const importMinY=srcNodes.length?Math.min(...srcNodes.map(n=>n.y)):0;
+
+  // Create ghost (semi-transparent) nodes on canvas
+  const nodeIdMap={};
+  const ghostIds=[];
+  srcNodes.forEach(n=>{
+    const newId='node-'+(++nodeCounter);
+    nodeIdMap[n.id]=newId;
+    const imported={
+      ...n, id:newId,
+      x:anchorX+(n.x-importMinX),
+      y:existingMinY+(n.y-importMinY),
+      w:n.w||160, h:n.h||120,
+      portfolio:Array.isArray(n.portfolio)?n.portfolio:(n.portfolio?[n.portfolio]:[]),
+      techFlags:Array.isArray(n.techFlags)?n.techFlags:[],
+      coe1:n.coe1||'', coe2:n.coe2||''
+    };
+    nodes[newId]=imported;
+    renderNode(imported,true);
+    // Make ghost semi-transparent
+    const el=document.getElementById(newId);
+    if(el){ el.style.opacity='0.55'; el.style.outline='2px dashed #5B4CF5'; el.style.pointerEvents='none'; }
+    ghostIds.push(newId);
+  });
+
+  // Store pending edges, shapes, texts (place on commit)
+  const pendingEdges=(s.edges||[]).map(edge=>({...edge,from:nodeIdMap[edge.from],to:nodeIdMap[edge.to]})).filter(e=>e.from&&e.to);
+  const pendingSh=(s.shapes||[]).map(sh=>({...sh,id:'shape-'+(++shapeCounter),_srcX:sh.x,_srcY:sh.y,_srcX1:sh.x1||sh.x,_srcY1:sh.y1||sh.y,_srcX2:sh.x2||sh.x,_srcY2:sh.y2||sh.y}));
+  const pendingTx=(s.texts||[]).map(t=>({...t,id:'text-'+(++shapeCounter),_srcX:t.x,_srcY:t.y}));
+
+  _mergePreview={snap,ghostIds,nodeIdMap,pendingEdges,pendingSh,pendingTx,anchorX,anchorY:existingMinY,importMinX,importMinY};
+
+  // Show instruction hint
+  document.getElementById('connect-hint').textContent='Move the preview, then click to place — or press Escape to cancel';
+  document.getElementById('connect-hint').style.display='block';
+  showSaveToast('Click to place • Escape to cancel');
+
+  // Add mousemove and click handlers
+  const cw=document.getElementById('canvas-wrap');
+  cw.addEventListener('mousemove',onMergePreviewMove);
+  cw.addEventListener('click',onMergePreviewClick,{once:true});
+}
+
+function onMergePreviewMove(e){
+  if(!_mergePreview)return;
+  const p=clientToCanvas(e.clientX,e.clientY);
+  const {ghostIds,importMinX,importMinY}=_mergePreview;
+  // Snap anchor to grid
+  const ax=snapPt(p.x);
+  const ay=snapPt(p.y);
+  ghostIds.forEach(id=>{
+    const n=nodes[id];if(!n)return;
+    // Reposition relative to the snapped anchor
+    const origN=_mergePreview.snap.state.nodes;
+    const srcNodes=Array.isArray(origN)?origN:Object.values(origN||{});
+    const orig=srcNodes.find(sn=>_mergePreview.nodeIdMap[sn.id]===id);
+    if(!orig)return;
+    n.x=ax+(orig.x-importMinX);
+    n.y=ay+(orig.y-importMinY);
+    const el=document.getElementById(id);
+    if(el){ el.style.left=n.x+'px'; el.style.top=n.y+'px'; }
+  });
+}
+
+function onMergePreviewClick(e){
+  if(!_mergePreview)return;
+  const cw=document.getElementById('canvas-wrap');
+  cw.removeEventListener('mousemove',onMergePreviewMove);
+  document.getElementById('connect-hint').style.display='none';
+
+  const {ghostIds,pendingEdges,pendingSh,pendingTx}=_mergePreview;
+
+  // Finalise ghost nodes — remove ghost styling
+  ghostIds.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.style.opacity=''; el.style.outline=''; el.style.pointerEvents=''; }
+    renderNode(nodes[id],true);
+  });
+
+  // Place edges
+  pendingEdges.forEach(edge=>{ edges.push({...edge,id:'edge-'+(++edgeCounter)}); });
+
+  // Place shapes and texts, offset to match where nodes landed
+  // Compute final offset from first ghost node vs original
+  const firstGhostId=ghostIds[0];
+  const firstNode=nodes[firstGhostId];
+  const origNodes=Array.isArray(_mergePreview.snap.state.nodes)?_mergePreview.snap.state.nodes:Object.values(_mergePreview.snap.state.nodes||{});
+  const firstOrig=origNodes.find(n=>_mergePreview.nodeIdMap[n.id]===firstGhostId);
+  const dx=firstNode&&firstOrig?firstNode.x-firstOrig.x:0;
+  const dy=firstNode&&firstOrig?firstNode.y-firstOrig.y:0;
+
+  pendingSh.forEach(sh=>{
+    shapes.push({...sh,x:sh._srcX+dx,y:sh._srcY+dy,x1:(sh._srcX1||sh._srcX)+dx,y1:(sh._srcY1||sh._srcY)+dy,x2:(sh._srcX2||sh._srcX)+dx,y2:(sh._srcY2||sh._srcY)+dy});
+  });
+  pendingTx.forEach(t=>{ texts.push({...t,x:t._srcX+dx,y:t._srcY+dy}); });
+
+  renderShapes(); renderTexts();
+  redrawEdges();
+  updateProtocolDatalist();
+  renderPanel();
+  document.getElementById('empty-state').style.display='none';
+  _mergePreview=null;
+  showSaveToast('Added to canvas ✓');
+}
+
+function cancelMergePreview(){
+  if(!_mergePreview)return;
+  const cw=document.getElementById('canvas-wrap');
+  cw.removeEventListener('mousemove',onMergePreviewMove);
+  cw.removeEventListener('click',onMergePreviewClick);
+  // Remove ghost nodes
+  _mergePreview.ghostIds.forEach(id=>{ document.getElementById(id)?.remove(); delete nodes[id]; });
+  document.getElementById('connect-hint').style.display='none';
+  _mergePreview=null;
+  showSaveToast('Import cancelled');
+}
+
+// ── Save menu dropdown ────────────────────────────────────────────────────────
+function openSaveMenu(e){
+  e.stopPropagation();
+  const menu=document.getElementById('save-menu');
+  const isOpen=menu.style.display==='block';
+  menu.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    const r=e.currentTarget.getBoundingClientRect();
+    menu.style.left=r.left+'px';
+    menu.style.top=(r.bottom+4)+'px';
+  }
+}
+function closeSaveMenu(){ document.getElementById('save-menu').style.display='none'; }
+
+// ── Toast notification ────────────────────────────────────────────────────────
+function showSaveToast(msg){
+  const t=document.getElementById('save-toast');
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(t._tid);
+  t._tid=setTimeout(()=>t.style.opacity='0',2500);
+}
+
+// ── Auto-save on unload + auto-load on start ──────────────────────────────────
+function autoSave(){
+  if(!Object.keys(nodes).length&&!shapes.length&&!texts.length)return;
+  const slots=getSlots();
+  // Update or create the auto-save slot (always first with name '__autosave__')
+  const idx=slots.findIndex(s=>s.name==='__autosave__');
+  const snap=buildSnapshot('__autosave__');
+  if(idx>=0)slots[idx]=snap;else slots.unshift(snap);
+  while(slots.length>20)slots.pop();
+  putSlots(slots);
+}
+function autoLoad(){
+  const slots=getSlots();
+  const auto=slots.find(s=>s.name==='__autosave__');
+  if(auto&&(Object.keys(auto.state.nodes||{}).length||auto.state.shapes?.length||auto.state.texts?.length)){
+    loadSnapshot(auto);
+  }
+}
+
+window.addEventListener('beforeunload',autoSave);
+document.addEventListener('click',e=>{ if(!e.target.closest('#save-menu')&&!e.target.closest('[onclick*="openSaveMenu"]'))closeSaveMenu(); });
+
+// ── Undo ─────────────────────────────────────────────────────────────────────
+function pushUndo(){
+  if(_undoPaused)return;
+  const snap={
+    nodes: JSON.parse(JSON.stringify(nodes)),
+    edges: JSON.parse(JSON.stringify(edges)),
+    shapes: JSON.parse(JSON.stringify(shapes)),
+    texts: JSON.parse(JSON.stringify(texts)),
+  };
+  undoStack.push(snap);
+  if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+}
+
+function popUndo(){
+  if(!undoStack.length){ showSaveToast('Nothing to undo'); return; }
+  _undoPaused=true;
+  const snap=undoStack.pop();
+
+  // Remove current nodes from DOM
+  Object.keys(nodes).forEach(id=>document.getElementById(id)?.remove());
+  document.getElementById('shapes-layer').innerHTML='';
+
+  // Restore
+  nodes=snap.nodes;
+  edges=snap.edges;
+  shapes=snap.shapes;
+  texts=snap.texts;
+  selNode=null; selNodes.clear(); selEdge=null;
+
+  Object.values(nodes).forEach(n=>renderNode(n,true));
+  renderShapes(); renderTexts();
+  redrawEdges();
+  hideProps(); closeConnPopup();
+  document.getElementById('empty-state').style.display=
+    Object.keys(nodes).length||shapes.length||texts.length?'none':'';
+
+  _undoPaused=false;
+  showSaveToast('Undone ✓');
+}
+
+// ── SharePoint folder integration ────────────────────────────────────────────
+const SP_FOLDER_URL='https://ts.accenture.com/sites/TSAExit-Modernization/Shared%20Documents/General/02.%20Modernization/01.%20Portfolio%20Delivery/Backoffice/Architecture/Saved%20Diagrams';
+
+async function spExportAndOpen(){
+  closeSaveMenu();
+  const defaultName=(Object.keys(nodes).length?Object.values(nodes)[0].label:'diagram')+'-'+new Date().toISOString().slice(0,10);
+  const name=await dlgPrompt('Name your diagram:',defaultName,'Save to SharePoint');
+  if(!name)return;
+  const filename=name.replace(/[^a-z0-9\-_. ]/gi,'_').trim()+'.json';
+  const snap=buildSnapshot(name);
+  const json=JSON.stringify(snap,null,2);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+  a.download=filename; a.click();
+  showSaveToast('Downloaded \u2713');
+  spShowFolderLink(filename);
+}
+
+function spShowFolderLink(filename){
+  document.getElementById('dlg-title').textContent='Upload to SharePoint';
+  const msg=document.getElementById('dlg-msg');
+  msg.style.whiteSpace='normal';
+  const url=SP_FOLDER_URL;
+  msg.innerHTML='';
+  if(filename) msg.innerHTML+='<strong>&#x2705; '+filename+' downloaded.</strong><br><br>';
+  msg.innerHTML+='Copy this URL and paste it in a new browser tab to open the SharePoint folder, then drag the file in:<br><br>';
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:6px;align-items:center';
+  const inp=document.createElement('input');
+  inp.value=url;inp.readOnly=true;
+  inp.style.cssText='flex:1;font-size:10px;padding:5px 7px;border:1px solid var(--bd);border-radius:6px;color:var(--tx2);background:var(--bg);cursor:text';
+  const btn=document.createElement('button');
+  btn.textContent='Copy URL';
+  btn.style.cssText='padding:5px 10px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);font-size:11px;cursor:pointer;white-space:nowrap';
+  btn.onclick=()=>{ navigator.clipboard.writeText(url).then(()=>{ btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy URL',1500); }); };
+  row.appendChild(inp);row.appendChild(btn);msg.appendChild(row);
+  document.getElementById('dlg-input').style.display='none';
+  document.getElementById('dlg-cancel').style.display='none';
+  document.getElementById('dlg-ok').textContent='Done';
+  document.getElementById('dlg-modal').style.display='flex';
+  _dlgResolve=()=>{ document.getElementById('dlg-modal').style.display='none'; _dlgResolve=null; };
+}
+
+function spOpenFolder(){
+  closeSaveMenu();
+  spShowFolderLink('');
+}
+
+// Remove old SP modal (not needed)
+// Load from SharePoint: use "Open SharePoint folder" → download JSON → Import from JSON file
+
+// ── Custom dialogs (replaces prompt/alert/confirm for SharePoint sandbox) ─────
+let _dlgResolve=null;
+function dlgResolve(val){
+  document.getElementById('dlg-modal').style.display='none';
+  if(_dlgResolve){_dlgResolve(val);_dlgResolve=null;}
+}
+function dlgAlert(msg,title='ArchFlow'){
+  return new Promise(res=>{
+    _dlgResolve=res;
+    document.getElementById('dlg-title').textContent=title;
+    document.getElementById('dlg-msg').textContent=msg;
+    document.getElementById('dlg-input').style.display='none';
+    document.getElementById('dlg-cancel').style.display='none';
+    document.getElementById('dlg-ok').textContent='OK';
+    document.getElementById('dlg-modal').style.display='flex';
+  });
+}
+function dlgConfirm(msg,title='Confirm'){
+  return new Promise(res=>{
+    _dlgResolve=res;
+    document.getElementById('dlg-title').textContent=title;
+    document.getElementById('dlg-msg').textContent=msg;
+    document.getElementById('dlg-input').style.display='none';
+    document.getElementById('dlg-cancel').style.display='';
+    document.getElementById('dlg-cancel').textContent='Cancel';
+    document.getElementById('dlg-ok').textContent='OK';
+    document.getElementById('dlg-modal').style.display='flex';
+  });
+}
+function dlgPrompt(msg,defaultVal='',title='ArchFlow'){
+  return new Promise(res=>{
+    _dlgResolve=res;
+    document.getElementById('dlg-title').textContent=title;
+    document.getElementById('dlg-msg').textContent=msg;
+    const inp=document.getElementById('dlg-input');
+    inp.value=defaultVal;inp.style.display='';inp.placeholder='';
+    document.getElementById('dlg-cancel').style.display='';
+    document.getElementById('dlg-cancel').textContent='Cancel';
+    document.getElementById('dlg-ok').textContent='OK';
+    document.getElementById('dlg-modal').style.display='flex';
+    setTimeout(()=>{inp.focus();inp.select();},50);
+  });
+}
+
+init();
+autoLoad();
+</script>
+</body>
+</html>
