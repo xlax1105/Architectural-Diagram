@@ -318,8 +318,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="save-menu-item" onclick="saveToSlot()">💾 Save (auto-slot)</div>
       <div class="save-menu-item" onclick="openSlotsModal()">📂 Manage saved diagrams</div>
       <div class="save-menu-sep"></div>
-      <div class="save-menu-item" onclick="spExportAndOpen()">☁ Save to SharePoint folder</div>
-      <div class="save-menu-item" onclick="spOpenFolder()">📂 Open SharePoint folder</div>
+      <div class="save-menu-item" onclick="spSaveDiagram()">☁ Save to SharePoint</div>
+      <div class="save-menu-item" onclick="spOpenBrowser()">📂 Load from SharePoint</div>
       <div class="save-menu-sep"></div>
       <div class="save-menu-item" onclick="exportJSON()">⬇ Export as JSON file</div>
       <div class="save-menu-item" onclick="document.getElementById('import-file-input').click()">⬆ Import from JSON file</div>
@@ -3474,56 +3474,130 @@ function popUndo(){
   showSaveToast('Undone ✓');
 }
 
-// ── SharePoint folder integration ────────────────────────────────────────────
-const SP_FOLDER_URL='https://ts.accenture.com/sites/TSAExit-Modernization/Shared%20Documents/General/02.%20Modernization/01.%20Portfolio%20Delivery/Backoffice/Architecture/Saved%20Diagrams';
+// ── SharePoint Integration ────────────────────────────────────────────────────
+const SP_ORIGIN='https://ts.accenture.com';
+const SP_SITE_REL='/sites/TSAExit-Modernization';
+const SP_FOLDER_REL='/sites/TSAExit-Modernization/Shared Documents/General/02. Modernization/01. Portfolio Delivery/Backoffice/Architecture/Saved Diagrams';
+const SP_API_BASE=SP_ORIGIN+SP_SITE_REL+'/_api/web';
 
-async function spExportAndOpen(){
+async function spDigest(){
+  const r=await fetch(SP_ORIGIN+SP_SITE_REL+'/_api/contextinfo',{
+    method:'POST',
+    credentials:'include',
+    headers:{'Accept':'application/json;odata=verbose','Content-Type':'application/json;odata=verbose'}
+  });
+  if(!r.ok) throw new Error('Auth failed ('+r.status+'). Make sure you are signed into Accenture Microsoft 365.');
+  const d=await r.json();
+  return d.d.GetContextWebInformation.FormDigestValue;
+}
+
+async function spSaveDiagram(){
   closeSaveMenu();
   const defaultName=(Object.keys(nodes).length?Object.values(nodes)[0].label:'diagram')+'-'+new Date().toISOString().slice(0,10);
-  const name=await dlgPrompt('Name your diagram:',defaultName,'Save to SharePoint');
+  const name=await dlgPrompt('Save to SharePoint as:',defaultName,'Save to SharePoint');
   if(!name)return;
   const filename=name.replace(/[^a-z0-9\-_. ]/gi,'_').trim()+'.json';
   const snap=buildSnapshot(name);
   const json=JSON.stringify(snap,null,2);
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([json],{type:'application/json'}));
-  a.download=filename; a.click();
-  showSaveToast('Downloaded \u2713');
-  spShowFolderLink(filename);
+  showSaveToast('Saving to SharePoint…');
+  try{
+    const digest=await spDigest();
+    const url=SP_API_BASE+`/GetFolderByServerRelativeUrl('${encodeURIComponent(SP_FOLDER_REL)}')/Files/Add(url='${encodeURIComponent(filename)}',overwrite=true)`;
+    const r=await fetch(url,{
+      method:'POST',
+      credentials:'include',
+      headers:{
+        'Accept':'application/json;odata=verbose',
+        'X-RequestDigest':digest,
+        'Content-Type':'application/octet-stream'
+      },
+      body:json
+    });
+    if(r.ok){ showSaveToast('Saved to SharePoint ✓'); }
+    else{ const t=await r.text().catch(()=>''); throw new Error(r.status+' '+r.statusText+' '+t.slice(0,80)); }
+  }catch(err){
+    console.error('SP save error:',err);
+    showSaveToast('Save failed');
+    await dlgAlert('Could not save to SharePoint:\n\n'+err.message+'\n\nMake sure you are signed into your Accenture Microsoft 365 account in this browser.','SharePoint Error');
+  }
 }
 
-function spShowFolderLink(filename){
-  document.getElementById('dlg-title').textContent='Upload to SharePoint';
+async function spOpenBrowser(){
+  closeSaveMenu();
+  // Reuse the SP modal that was removed — show inline in a dlg modal instead
+  document.getElementById('dlg-title').textContent='SharePoint Diagrams';
   const msg=document.getElementById('dlg-msg');
-  msg.style.whiteSpace='normal';
-  const url=SP_FOLDER_URL;
-  msg.innerHTML='';
-  if(filename) msg.innerHTML+='<strong>&#x2705; '+filename+' downloaded.</strong><br><br>';
-  msg.innerHTML+='Copy this URL and paste it in a new browser tab to open the SharePoint folder, then drag the file in:<br><br>';
-  const row=document.createElement('div');
-  row.style.cssText='display:flex;gap:6px;align-items:center';
-  const inp=document.createElement('input');
-  inp.value=url;inp.readOnly=true;
-  inp.style.cssText='flex:1;font-size:10px;padding:5px 7px;border:1px solid var(--bd);border-radius:6px;color:var(--tx2);background:var(--bg);cursor:text';
-  const btn=document.createElement('button');
-  btn.textContent='Copy URL';
-  btn.style.cssText='padding:5px 10px;border-radius:6px;border:1px solid var(--bd);background:var(--s2);font-size:11px;cursor:pointer;white-space:nowrap';
-  btn.onclick=()=>{ navigator.clipboard.writeText(url).then(()=>{ btn.textContent='Copied!'; setTimeout(()=>btn.textContent='Copy URL',1500); }); };
-  row.appendChild(inp);row.appendChild(btn);msg.appendChild(row);
+  msg.innerHTML='<div style="color:var(--tx3)">Loading…</div>';
   document.getElementById('dlg-input').style.display='none';
   document.getElementById('dlg-cancel').style.display='none';
-  document.getElementById('dlg-ok').textContent='Done';
+  document.getElementById('dlg-ok').textContent='Close';
   document.getElementById('dlg-modal').style.display='flex';
   _dlgResolve=()=>{ document.getElementById('dlg-modal').style.display='none'; _dlgResolve=null; };
+  try{
+    const url=SP_API_BASE+`/GetFolderByServerRelativeUrl('${encodeURIComponent(SP_FOLDER_REL)}')/Files?$select=Name,TimeLastModified,ServerRelativeUrl&$orderby=TimeLastModified%20desc`;
+    const r=await fetch(url,{credentials:'include',headers:{'Accept':'application/json;odata=verbose'}});
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    const data=await r.json();
+    const files=(data.d?.results||[]).filter(f=>f.Name.endsWith('.json'));
+    if(!files.length){
+      msg.innerHTML='<div style="color:var(--tx3);font-style:italic">No saved diagrams found in the SharePoint folder.</div>';
+      return;
+    }
+    msg.innerHTML='<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">Click a diagram to load it.</div>';
+    const list=document.createElement('div');
+    list.style.cssText='max-height:300px;overflow-y:auto';
+    files.forEach(f=>{
+      const d=new Date(f.TimeLastModified);
+      const label=f.Name.replace(/\.json$/,'');
+      const dateStr=isNaN(d)?'':d.toLocaleDateString()+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+      const row=document.createElement('div');
+      row.className='slot-row';row.style.cursor='pointer';
+      row.innerHTML=`<div class="slot-name"><div class="slot-name-text">☁ ${label}</div><div class="slot-meta">${dateStr}</div></div>
+        <div class="slot-act"><button class="slot-btn danger" onclick="event.stopPropagation();spDeleteFile('${f.ServerRelativeUrl.replace(/'/g,"\\'")}','${label.replace(/'/g,"\\'")}')">✕</button></div>`;
+      row.addEventListener('click',()=>spLoadFile(f.ServerRelativeUrl,label));
+      list.appendChild(row);
+    });
+    msg.appendChild(list);
+  }catch(err){
+    console.error('SP browse error:',err);
+    msg.innerHTML=`<div style="color:var(--red)">Could not connect to SharePoint.<br><small style="color:var(--tx3)">${err.message}</small><br><br><small>Make sure you are signed into Accenture Microsoft 365 in this browser.</small></div>`;
+  }
 }
 
-function spOpenFolder(){
-  closeSaveMenu();
-  spShowFolderLink('');
+async function spLoadFile(serverRelativeUrl,label){
+  document.getElementById('dlg-modal').style.display='none';
+  _dlgResolve=null;
+  showSaveToast('Loading from SharePoint…');
+  try{
+    const url=SP_API_BASE+`/GetFileByServerRelativeUrl('${encodeURIComponent(serverRelativeUrl)}')/$value`;
+    const r=await fetch(url,{credentials:'include',headers:{'Accept':'application/json, */*'}});
+    if(!r.ok) throw new Error(r.status+' '+r.statusText);
+    const snap=await r.json();
+    if(!snap.state) throw new Error('Invalid diagram file');
+    _pendingImportSnap=snap;
+    document.getElementById('icm-title').textContent='Load "'+label+'" from SharePoint';
+    const nc=Object.keys(snap.state.nodes||{}).length;
+    document.getElementById('icm-desc').textContent='This diagram has '+nc+' application'+(nc!==1?'s':'')+'. How would you like to load it?';
+    document.getElementById('import-choice-modal').style.display='flex';
+  }catch(err){
+    showSaveToast('Load failed');
+    await dlgAlert('Could not load: '+err.message,'SharePoint Error');
+  }
 }
 
-// Remove old SP modal (not needed)
-// Load from SharePoint: use "Open SharePoint folder" → download JSON → Import from JSON file
+async function spDeleteFile(serverRelativeUrl,label){
+  if(!await dlgConfirm('Delete "'+label+'" from SharePoint?\nThis cannot be undone.','Delete'))return;
+  try{
+    const digest=await spDigest();
+    const url=SP_API_BASE+`/GetFileByServerRelativeUrl('${encodeURIComponent(serverRelativeUrl)}')`;
+    const r=await fetch(url,{
+      method:'POST',credentials:'include',
+      headers:{'X-RequestDigest':digest,'X-HTTP-Method':'DELETE','IF-MATCH':'*','Accept':'application/json;odata=verbose'}
+    });
+    if(r.ok||r.status===200||r.status===204){showSaveToast('Deleted ✓');spOpenBrowser();}
+    else throw new Error(r.status+' '+r.statusText);
+  }catch(err){ await dlgAlert('Could not delete: '+err.message,'SharePoint Error'); }
+}
 
 // ── Custom dialogs (replaces prompt/alert/confirm for SharePoint sandbox) ─────
 let _dlgResolve=null;
