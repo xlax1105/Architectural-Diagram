@@ -100,7 +100,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .nfooter{display:flex;align-items:center;justify-content:space-between;padding:0 9px 7px}
 .node-dimmed{opacity:0.15!important;filter:grayscale(1)!important}
 .node-highlighted{opacity:1!important;filter:none!important;outline:2.5px solid var(--ac)!important}
+#edge-handles{position:absolute;top:0;left:0;width:4000px;height:4000px;pointer-events:none;transform-origin:0 0;z-index:5}
+.edge-handle{position:absolute;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%);pointer-events:all;cursor:move;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.edge-handle.cp{background:#fff;border:2px solid var(--ac)}
+.edge-handle.ep{background:var(--ac);border:2px solid #fff}
+.ctx-item{padding:8px 16px;cursor:pointer;color:var(--tx2)}
+.ctx-item:hover{background:var(--ac-l);color:var(--ac)}
+.node-meta{padding:0 8px 6px;display:none}
 .node:hover .node-meta,.node.selected .node-meta,.node.multi-sel .node-meta{display:block}
+.node-focused .node-meta{display:block}
 .port{width:11px;height:11px;border-radius:50%;background:var(--bd2);border:2px solid var(--surface);cursor:crosshair;transition:background .1s,transform .1s;flex-shrink:0}
 .port:hover{background:var(--ac);transform:scale(1.4)}
 .ibtn{width:18px;height:18px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--tx3);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
@@ -266,7 +274,7 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
 .fb-clear:hover{color:var(--red)}
 /* filtered node states */
 .node.flt-hidden{opacity:0;pointer-events:none}
-.node.flt-dim{opacity:0.22;pointer-events:none}
+.node.flt-dim{opacity:0.4;pointer-events:none;outline:2px dashed #94a3b8;outline-offset:4px}
 
 /* ── save menu ── */
 .save-menu-item{padding:9px 14px;font-size:12px;cursor:pointer;transition:background .1s;white-space:nowrap}
@@ -333,6 +341,7 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
   <button class="tbbtn" id="btn-edge-labels" onclick="toggleEdgeLabels()" title="Show/hide connection labels">⊙ Labels</button>
   <button class="tbbtn" id="btn-lasso" onclick="toggleLasso()" title="Lasso / rubber-band select">⬚ Lasso</button>
   <button class="tbbtn" id="btn-view-mode" onclick="toggleViewMode()" title="Focus view — click a node to highlight connections">◎ Focus</button>
+  <button class="tbbtn" id="btn-edges-top" onclick="toggleEdgesOnTop()" title="Show all connection arrows above nodes">↑ Connections</button>
   <div class="tbsep"></div>
   <div style="position:relative">
     <button class="tbbtn" onclick="openSaveMenu(event)" title="Save / Load">💾 Save ▾</button>
@@ -383,7 +392,8 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
 
   <div id="canvas-wrap">
     <svg id="canvas-bg" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid-pat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d0ced0" stroke-width="0.75"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid-pat)"/></svg>
-    <div id="shapes-layer" style="position:absolute;top:0;left:0;width:4000px;height:4000px;transform-origin:0 0;z-index:1"></div>
+    <svg id="portfolio-overlay" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:3;pointer-events:none"></svg>
+    <div id="shapes-layer" style="position:absolute;top:0;left:0;width:4000px;height:4000px;transform-origin:0 0;z-index:2"></div>
     <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#9ca3af"/></marker>
@@ -395,12 +405,24 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
     <div id="canvas">
       <div id="edge-labels-layer" style="position:absolute;top:0;left:0;pointer-events:none;width:4000px;height:4000px"></div>
     </div>
+    <!-- Top edge layer: edges between overlapping nodes render above all nodes -->
+    <svg id="svg-layer-top" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:4;pointer-events:none">
+      <defs>
+        <marker id="ah-top" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#9ca3af"/></marker>
+        <marker id="ah-top-sel" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#5B4CF5"/></marker>
+      </defs>
+      <g id="edges-layer-top"></g>
+    </svg>
     <div id="sel-rect"></div>
+    <div id="edge-handles"></div>
     <svg id="draw-layer" xmlns="http://www.w3.org/2000/svg"></svg>
     <div id="connect-overlay" onclick="onConnectOverlayClick()"></div>
     <div id="connect-hint"></div>
     <div id="empty-state"><div class="esi">⬡</div><p>Drag an app type onto the canvas<br>or use the draw tools above</p></div>
-    <div id="zoom-controls">
+    <div id="focus-chips" style="display:none;position:fixed;bottom:48px;left:50%;transform:translateX(-50%);z-index:500;background:var(--surface);border:1px solid var(--bd2);border-radius:20px;padding:6px 12px;box-shadow:0 2px 16px rgba(0,0,0,.15);display:none;gap:6px;align-items:center;flex-wrap:wrap;max-width:80vw" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
+    <span style="font-size:11px;color:var(--tx3);margin-right:2px">Show:</span>
+  </div>
+  <div id="zoom-controls">
       <button class="zbtn" onclick="zoom(-1)">−</button>
       <span id="zlabel">100%</span>
       <button class="zbtn" onclick="zoom(1)">+</button>
@@ -478,6 +500,14 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
   </div>
 </div>
 
+<!-- Context menu for layer ordering -->
+<div id="ctx-menu" style="display:none;position:fixed;z-index:2000;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.15);padding:4px 0;min-width:180px;font-size:13px">
+  <div class="ctx-item" onclick="ctxAction('front')">⬆ Bring to Front</div>
+  <div class="ctx-item" onclick="ctxAction('forward')">↑ Bring Forward</div>
+  <div class="ctx-item" onclick="ctxAction('backward')">↓ Send Backward</div>
+  <div class="ctx-item" onclick="ctxAction('back')">⬇ Send to Back</div>
+</div>
+
 <!-- edge modal -->
 <div id="edge-modal" class="mbdrop" style="display:none" onclick="if(event.target===this)closeEdgeModal()">
   <div class="modal">
@@ -495,6 +525,7 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
     </div>
     <div class="mact">
       <button class="btn-d" onclick="deleteEdge()">Delete</button>
+      <button class="btn-g" onclick="resetEdgeShape()" title="Reset arrow to auto position">↺ Reset arrow</button>
       <button class="btn-g" onclick="closeEdgeModal()">Cancel</button>
       <button class="btn-p" onclick="saveEdge()">Save</button>
     </div>
@@ -527,6 +558,7 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
 let nodes={}, edges=[], shapes=[], texts=[];
 let nodeTypes=[];
 let selNode=null, selEdge=null, selShape=null;
+let draggingEdgeHandle=null; // {edgeId, kind:'cp'|'from'|'to'}
 let selNodes=new Set();   // multi-select set of node ids
 let nodeCounter=0, edgeCounter=0, typeCounter=0, shapeCounter=0;
 let connectMode=false, connectFrom=null;
@@ -546,6 +578,10 @@ let spaceDown=false;
 let rubberBanding=false, rbStart=null;
 let lassoMode=false;
 let viewMode=false;
+let edgesOnTop=false;
+let focusNodeId=null;
+let focusActiveTypes=new Set(['app','external']);
+let _applyingFocus=false;
 // Undo history
 const UNDO_LIMIT=50;
 let undoStack=[];
@@ -555,7 +591,7 @@ let showEdgeLabels=true;
 // Clipboard
 let clipboard=[];
 // Connection protocols (editable list)
-let connectionProtocols=['REST / HTTP','RaaS','API Call','Message queue','Database query','File transfer','SFTP'];
+let connectionProtocols=['REST / HTTP','SOAP','RaaS','Message queue','Database Connection','File transfer','SFTP','SFTP - Via FedexNet'];
 // View filters
 let viewFilters={portfolio:new Set(), eai:new Set(), techFlags:new Set(), coe:new Set()};
 // Popup state
@@ -564,12 +600,10 @@ let cpView='detail', cpActiveTypes=new Set(), cpExpanded={}, cpNodeId=null;
 // ── Built-in node types ───────────────────────────────────────────────────────
 const BUILTIN_TYPES = [
   {id:'app',     label:'Application',           sub:'Web / mobile / desktop', icon:'◼', color:'#f1f5f9', iconColor:'#3b82f6'},
-  {id:'appcomp', label:'Application Components',sub:'Modules / services',      icon:'◈', color:'#f0fdf4', iconColor:'#16a34a'},
-  {id:'appmod',  label:'App Component',          sub:'Component / module',      icon:'⬡', color:'#eff6ff', iconColor:'#2563eb'},
+  {id:'appcomp', label:'Application Components',sub:'Modules / services',      icon:'▦', color:'#fef9c3', iconColor:'#eab308'},
   {id:'queue',   label:'Message Queue',         sub:'Kafka, RabbitMQ, SQS',   icon:'≡', color:'#fce7f3', iconColor:'#ec4899'},
   {id:'external',label:'External System',       sub:'Third-party / vendor',   icon:'⊕', color:'#dcfce7', iconColor:'#16a34a'},
   {id:'user',    label:'User / Client',         sub:'Browser, mobile, CLI',   icon:'◎', color:'#e0f2fe', iconColor:'#0ea5e9'},
-  {id:'storage', label:'Storage / CDN',         sub:'S3, blob, CDN, FS',      icon:'▦', color:'#fef9c3', iconColor:'#eab308'},
   {id:'wd',      label:'WD Integration',        sub:'Workday integration',     icon:'⇋', color:'#fef0f9', iconColor:'#c026d3', svgIcon:true},
 ];
 const PALETTE = ['#f1f5f9','#dbeafe','#ede9fe','#dcfce7','#fef3c7','#fce7f3','#e0f2fe','#fef9c3','#fff7ed','#f0fdf4','#f8fafc','#fafaf5'];
@@ -591,14 +625,28 @@ function toggleViewMode(){
   document.getElementById('btn-view-mode').classList.toggle('active',viewMode);
   document.getElementById('mode-label').textContent=viewMode?'Focus mode — click a node to highlight connections':'Select mode';
   document.getElementById('canvas-wrap').style.cursor=viewMode?'pointer':'grab';
-  if(!viewMode) clearViewFocus();
+  // Disable/enable filter bar
+  const fb=document.getElementById('filter-bar');
+  if(viewMode){
+    fb.style.opacity='0.4';
+    fb.style.pointerEvents='none';
+    fb.title='Filters are disabled in Focus mode';
+  } else {
+    fb.style.opacity='';
+    fb.style.pointerEvents='';
+    fb.title='';
+    clearViewFocus();
+  }
 }
 
 function clearViewFocus(){
+  focusNodeId=null;
+  document.getElementById('focus-chips').style.display='none';
+  clearPortfolioOverlay();
   Object.values(nodes).forEach(n=>{
     const el=document.getElementById(n.id);
     if(!el)return;
-    el.classList.remove('node-dimmed','node-highlighted');
+    el.classList.remove('node-dimmed','node-highlighted','node-focused');
     el.style.opacity=''; el.style.filter=''; el.style.outline='';
     el.style.outlineOffset=''; el.style.zIndex='';
   });
@@ -607,76 +655,113 @@ function clearViewFocus(){
   document.querySelectorAll('.el-wrap').forEach(w=>{w.style.opacity='';});
 }
 
+function renderFocusChips(){
+  const bar=document.getElementById('focus-chips');
+  if(!focusNodeId||!viewMode){bar.style.display='none';return;}
+  bar.style.display='flex';
+  while(bar.children.length>1) bar.removeChild(bar.lastChild);
+  // Find all types reachable from focused node
+  const typesInGraph=new Set();
+  const visited=new Set([focusNodeId]);
+  const q=[focusNodeId];
+  while(q.length){
+    const cur=q.shift();
+    edges.forEach(e=>{
+      const other=e.from===cur?e.to:e.to===cur?e.from:null;
+      if(other&&nodes[other]&&!visited.has(other)){visited.add(other);q.push(other);typesInGraph.add(nodes[other].type);}
+    });
+  }
+  if(nodes[focusNodeId]) typesInGraph.add(nodes[focusNodeId].type);
+  nodeTypes.forEach(nt=>{
+    if(!typesInGraph.has(nt.id))return;
+    const active=focusActiveTypes.has(nt.id);
+    const chip=document.createElement('button');
+    chip.style.cssText=`padding:3px 10px;border-radius:12px;border:1.5px solid ${active?nt.iconColor:'var(--bd)'};background:${active?nt.color:'var(--surface)'};color:${active?nt.iconColor:'var(--tx3)'};font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px`;
+    chip.innerHTML=`<span>${nt.icon}</span>${nt.label}`;
+    chip.addEventListener('click',()=>{
+      if(focusActiveTypes.has(nt.id)) focusActiveTypes.delete(nt.id);
+      else focusActiveTypes.add(nt.id);
+      applyViewFocus(focusNodeId);
+    });
+    bar.appendChild(chip);
+  });
+}
+
 function applyViewFocus(nodeId){
-  // BFS outbound and inbound to find all reachable nodes + edges
+  focusNodeId=nodeId;
+  _applyingFocus=true;
   const connectedIds=new Set([nodeId]);
   const connectedEdgeIds=new Set();
-
   const outQ=[nodeId];
   while(outQ.length){
     const cur=outQ.shift();
-    edges.forEach(e=>{
-      if(e.from===cur){
-        connectedEdgeIds.add(e.id);
-        if(!connectedIds.has(e.to)){connectedIds.add(e.to);outQ.push(e.to);}
-      }
-    });
+    edges.forEach(e=>{if(e.from===cur){connectedEdgeIds.add(e.id);if(!connectedIds.has(e.to)){connectedIds.add(e.to);outQ.push(e.to);}}});
   }
-  const inQ=[nodeId];
-  const inVisited=new Set([nodeId]);
+  const inQ=[nodeId];const inV=new Set([nodeId]);
   while(inQ.length){
     const cur=inQ.shift();
-    edges.forEach(e=>{
-      if(e.to===cur){
-        connectedEdgeIds.add(e.id);
-        if(!connectedIds.has(e.from)){connectedIds.add(e.from);}
-        if(!inVisited.has(e.from)){inVisited.add(e.from);inQ.push(e.from);}
-      }
-    });
+    edges.forEach(e=>{if(e.to===cur){connectedEdgeIds.add(e.id);if(!connectedIds.has(e.from)){connectedIds.add(e.from);}if(!inV.has(e.from)){inV.add(e.from);inQ.push(e.from);}}});
   }
-
-  // First redraw edges fresh, then apply highlight on top
+  // Always show source node; filter others by active types
+  const visibleIds=new Set([nodeId]);
+  connectedIds.forEach(id=>{if(id===nodeId)return;const n=nodes[id];if(n&&focusActiveTypes.has(n.type))visibleIds.add(id);});
+  // Only show edges where both endpoints visible
+  const visibleEdgeIds=new Set();
+  connectedEdgeIds.forEach(eid=>{const e=edges.find(ed=>ed.id===eid);if(e&&visibleIds.has(e.from)&&visibleIds.has(e.to))visibleEdgeIds.add(eid);});
   redrawEdges();
-
-  // Dim/highlight nodes
+  // Always apply focus dimming on top of any active filter redraw
   Object.keys(nodes).forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el)return;
+    const el=document.getElementById(id);if(!el)return;
+    el.classList.remove('flt-hidden','flt-dim'); // focus overrides filter display
     if(id===nodeId){
-      el.style.outline='3px solid var(--ac)';
-      el.style.outlineOffset='2px';
-      el.style.zIndex='10';
-      el.style.opacity='1';
-      el.style.filter='none';
-    } else if(connectedIds.has(id)){
-      el.style.opacity='1';
-      el.style.filter='none';
-      el.style.zIndex='5';
-      el.style.outline='';
+      el.style.outline='3px solid var(--ac)';el.style.outlineOffset='2px';el.style.zIndex='10';
+      el.style.opacity='1';el.style.filter='none';el.classList.add('node-focused');
+    } else if(visibleIds.has(id)){
+      el.style.opacity='1';el.style.filter='none';el.style.zIndex='5';el.style.outline='';
+      el.classList.add('node-focused');
     } else {
-      el.style.opacity='0.12';
-      el.style.filter='grayscale(1)';
-      el.style.outline='';
+      el.style.opacity='0.08';el.style.filter='grayscale(1)';el.style.outline='';
+      el.classList.remove('node-focused');
     }
   });
-
-  // Apply edge styles after redraw
   const layer=document.getElementById('edges-layer');
-  layer.querySelectorAll('path[data-edge-id]').forEach(p=>{
+  const layerTop=document.getElementById('edges-layer-top');
+  // Hide all paths first, then show only focus edges
+  [...layer.querySelectorAll('path'),...layerTop.querySelectorAll('path')].forEach(p=>{
+    p.style.opacity='0.05'; p.style.stroke=''; p.style.strokeWidth='';
+  });
+  [...layer.querySelectorAll('path[data-edge-id]'),...layerTop.querySelectorAll('path[data-edge-id]')].forEach(p=>{
     const eid=p.dataset.edgeId;
-    if(connectedEdgeIds.has(eid)){
-      p.style.opacity='1';
-      p.style.stroke='var(--ac)';
-      p.style.strokeWidth='2.5';
-    } else {
-      p.style.opacity='0.08';
-    }
+    if(visibleEdgeIds.has(eid)){p.style.opacity='1';p.style.stroke='var(--ac)';p.style.strokeWidth='2.5';}
   });
   document.querySelectorAll('.el-wrap').forEach(w=>{
     const pill=w.querySelector('.el-pill');
     const eid=pill?.dataset?.edgeId||w.dataset?.edgeId;
-    w.style.opacity=connectedEdgeIds.has(eid)?'1':'0.08';
+    w.style.opacity=visibleEdgeIds.has(eid)?'1':'0.05';
   });
+  // Draw portfolio boxes around connected nodes that have a different portfolio than the source
+  const srcPortfolios=new Set(nodes[nodeId]?.portfolio||[]);
+  const crossPortfolioConnected=new Set();
+  visibleIds.forEach(id=>{
+    if(id===nodeId)return;
+    const n=nodes[id];if(!n)return;
+    const nPortfolios=n.portfolio||[];
+    // Cross-portfolio if no overlap with source portfolios, or source has no portfolio
+    const isCross=srcPortfolios.size===0||nPortfolios.length===0||!nPortfolios.some(p=>srcPortfolios.has(p));
+    if(isCross) crossPortfolioConnected.add(id);
+  });
+  if(crossPortfolioConnected.size) renderPortfolioOverlay(crossPortfolioConnected);
+  else clearPortfolioOverlay();
+
+  renderFocusChips();
+  _applyingFocus=false;
+}
+
+function toggleEdgesOnTop(){
+  edgesOnTop=!edgesOnTop;
+  document.getElementById('btn-edges-top').classList.toggle('active',edgesOnTop);
+  document.getElementById('mode-label').textContent=edgesOnTop?'Connections on top — arrows above all nodes':'Select mode';
+  redrawEdges();
 }
 
 function toggleLasso(){
@@ -1062,8 +1147,11 @@ function applyCanvasTransform(){
   const t=`translate(${panX}px,${panY}px) scale(${scale})`;
   document.getElementById('canvas').style.transform=t;
   document.getElementById('svg-layer').style.transform=t;
+  document.getElementById('svg-layer-top').style.transform=t;
   document.getElementById('draw-layer').style.transform=t;
   document.getElementById('shapes-layer').style.transform=t;
+  document.getElementById('edge-handles').style.transform=t;
+  document.getElementById('portfolio-overlay').style.transform=t;
   // Scale grid dots with zoom
   const gs=GRID*scale;
   document.getElementById('canvas-bg').querySelector('pattern').setAttribute('width',gs);
@@ -1090,7 +1178,7 @@ function createNode(type,x,y,opts={}){
   if(!nt)return null;
   pushUndo();
   const id='node-'+(++nodeCounter);
-  nodes[id]={id,type,x,y,w:opts.w||160,h:opts.h||120,label:opts.label||nt.label,subtitle:opts.subtitle||'',color:opts.color||nt.color,eai:opts.eai||'',portfolio:opts.portfolio||[],techFlags:opts.techFlags||[],coe1:opts.coe1||'',coe2:opts.coe2||'',fontSize:opts.fontSize||13};
+  nodes[id]={id,type,x,y,w:opts.w||160,h:opts.h||120,label:opts.label||nt.label,subtitle:opts.subtitle||'',color:opts.color||nt.color,eai:opts.eai||'',portfolio:opts.portfolio||[],techFlags:opts.techFlags||[],coe1:opts.coe1||'',coe2:opts.coe2||'',coe3:opts.coe3||'',fontSize:opts.fontSize||13};
   renderNode(nodes[id],true);
   selectNode(id);
   if(typeof buildFbEaiDropdown==='function')buildFbEaiDropdown();
@@ -1145,11 +1233,12 @@ function renderNode(node,forceContent=true){
         <div class="port" data-node="${node.id}" title="Click to connect" style="flex-shrink:0;margin-left:4px"></div>
       </div>
       ${node.subtitle?`<div class="nsub" style="font-size:10px">${esc(node.subtitle)}</div>`:''}
-      ${(node.portfolio&&node.portfolio.length)||(node.coe1||node.coe2)?`<div style="padding:2px 11px 4px;font-size:9px;color:var(--tx3);line-height:1.7">${node.portfolio&&node.portfolio.length?`<span style="font-weight:600">Portfolio:</span> ${esc(node.portfolio.join(', '))}${node.coe1||node.coe2?'<br>':''}`:''  }${node.coe1?`<span style="font-weight:600">COE 1:</span> ${esc(node.coe1)}${node.coe2?' &nbsp;':''}`:''}${node.coe2?`<span style="font-weight:600">COE 2:</span> ${esc(node.coe2)}`:''}</div>`:''}
+      ${(node.portfolio&&node.portfolio.length)||(node.coe1||node.coe2||node.coe3)?`<div style="padding:2px 11px 4px;font-size:9px;color:var(--tx3);line-height:1.7">${node.portfolio&&node.portfolio.length?`<span style="font-weight:600">Portfolio:</span> ${esc(node.portfolio.join(', '))}${node.coe1||node.coe2||node.coe3?'<br>':''}`:''  }${node.coe1?`<span style="font-weight:600">COE 1:</span> ${esc(node.coe1)} `:''}${node.coe2?`<span style="font-weight:600">COE 2:</span> ${esc(node.coe2)} `:''}${node.coe3?`<span style="font-weight:600">COE 3:</span> ${esc(node.coe3)}`:''}</div>`:''}
       ${node.techFlags&&node.techFlags.length?`<div class="node-meta"><div style="display:flex;flex-wrap:wrap;gap:3px;padding:2px 0">${node.techFlags.map(f=>`<span style="background:var(--ac-l);color:var(--ac);border-radius:4px;padding:1px 5px;font-size:8px;font-weight:600;white-space:nowrap;line-height:1.6">${esc(f)}</span>`).join('')}</div></div>`:''}
       <div style="height:6px"></div>`;
     el.querySelector('.port').addEventListener('click',e=>{e.stopPropagation();startConnect(node.id);});
     el.querySelector('.ibtn').addEventListener('click',e=>{e.stopPropagation();openConnPopup(node.id,e);});
+    el.addEventListener('contextmenu',e=>openCtxMenu(e,'node',node.id));
 
     // Double-click title to edit inline
     el.querySelector('.ntitle').addEventListener('dblclick',e=>{
@@ -1194,6 +1283,8 @@ function renderNode(node,forceContent=true){
         applyViewFocus(node.id);
         return;
       }
+      // If an edge is hovered above this node, let the edge click handler take it
+      if(hoveredEdgeId){ return; }
       if(lassoMode&&!selNodes.has(node.id)&&!el.classList.contains('multi-sel'))return;
       e.stopPropagation();
       if(e.ctrlKey||e.metaKey){
@@ -1316,6 +1407,30 @@ function startGroupDrag(e){
 }
 
 function onMouseMove(e){
+  // ── Edge handle drag — must be first ──
+  if(draggingEdgeHandle){
+    const p=clientToCanvas(e.clientX,e.clientY);
+    const edge=edges.find(ed=>ed.id===draggingEdgeHandle.edgeId);
+    if(edge){
+      if(draggingEdgeHandle.kind==='cp'){
+        // Control point: free move with grid snap
+        edge.cpX=snapPt(p.x); edge.cpY=snapPt(p.y);
+      } else if(draggingEdgeHandle.kind==='from'){
+        // Endpoint: snap to perimeter of the FROM node
+        const n=nodes[edge.from];
+        if(n){ const pt=snapToNodePerimeter(n,p); edge.fromPtX=pt.x; edge.fromPtY=pt.y; }
+        else { edge.fromPtX=snapPt(p.x); edge.fromPtY=snapPt(p.y); }
+      } else if(draggingEdgeHandle.kind==='to'){
+        // Endpoint: snap to perimeter of the TO node
+        const n=nodes[edge.to];
+        if(n){ const pt=snapToNodePerimeter(n,p); edge.toPtX=pt.x; edge.toPtY=pt.y; }
+        else { edge.toPtX=snapPt(p.x); edge.toPtY=snapPt(p.y); }
+      }
+      redrawEdges();
+      showEdgeToolbar(draggingEdgeHandle.edgeId);
+    }
+    return;
+  }
   // ── Pan ──
   if(panning){
     panX=panStartPanX+(e.clientX-panStartX);
@@ -1431,6 +1546,17 @@ function onMouseMove(e){
     const el=document.getElementById(id);
     el.style.left=node.x+'px'; el.style.top=node.y+'px';
     el.style.width=node.w+'px'; el.style.height=node.h+'px';
+    // Re-snap any custom edge endpoints attached to this node to the updated perimeter
+    edges.forEach(edge=>{
+      if(edge.from===id&&edge.fromPtX!==undefined){
+        const snapped=snapToNodePerimeter(node,{x:edge.fromPtX,y:edge.fromPtY});
+        edge.fromPtX=snapped.x; edge.fromPtY=snapped.y;
+      }
+      if(edge.to===id&&edge.toPtX!==undefined){
+        const snapped=snapToNodePerimeter(node,{x:edge.toPtX,y:edge.toPtY});
+        edge.toPtX=snapped.x; edge.toPtY=snapped.y;
+      }
+    });
     redrawEdges(); return;
   }
   if(!dragging)return;
@@ -1438,9 +1564,21 @@ function onMouseMove(e){
   if(dragging.kind==='node'){
     const nx=snapPt(p.x-dragOffX);
     const ny=snapPt(p.y-dragOffY);
-    nodes[dragging.id].x=nx; nodes[dragging.id].y=ny;
-    const el=document.getElementById(dragging.id);
+    const nid=dragging.id;
+    nodes[nid].x=nx; nodes[nid].y=ny;
+    const el=document.getElementById(nid);
     el.style.left=nx+'px'; el.style.top=ny+'px';
+    // Re-snap custom endpoints attached to this node
+    edges.forEach(edge=>{
+      if(edge.from===nid&&edge.fromPtX!==undefined){
+        const snapped=snapToNodePerimeter(nodes[nid],{x:edge.fromPtX,y:edge.fromPtY});
+        edge.fromPtX=snapped.x; edge.fromPtY=snapped.y;
+      }
+      if(edge.to===nid&&edge.toPtX!==undefined){
+        const snapped=snapToNodePerimeter(nodes[nid],{x:edge.toPtX,y:edge.toPtY});
+        edge.toPtX=snapped.x; edge.toPtY=snapped.y;
+      }
+    });
     redrawEdges();
   } else if(dragging.kind==='multi'){
     selNodes.forEach(id=>{
@@ -1477,6 +1615,7 @@ function onMouseMove(e){
   }
 }
 function onMouseUp(e){
+  if(draggingEdgeHandle){draggingEdgeHandle=null;document.body.style.cursor='';pushUndo();}
   if(resizing){resizing=null;document.body.style.cursor='';pushUndo();}
   if(resizingShape){
     // Commit the pending resize to the actual shape
@@ -1557,6 +1696,9 @@ function onCanvasMouseDown(e){
 
   if(e.button!==0)return;
 
+  // Edge handle clicks are handled in capture phase — don't pan
+  if(e.target.classList.contains('edge-handle'))return;
+
   // In lasso mode: always intercept and start rubber-band (capture phase ensures this fires first)
   if(lassoMode&&!e.target.closest('.ibtn,.port,.cshape-del,.ctextblock-del,.resize-handle,.shape-rh')){
     // Allow drag on already-selected items — only intercept on unselected/background
@@ -1581,11 +1723,10 @@ function onCanvasMouseDown(e){
   }
 
   // If the click landed on an interactive element, let it handle itself
-  const interactive=e.target.closest('.node,.cshape,.ctextblock,.ibtn,.port,.resize-handle,.el-wrap,.fb-dropdown,.ms-dropdown,.modal,.tbbtn,#zoom-controls,#connect-hint,#empty-state,#conn-popup,#save-menu,#slots-modal,#edge-modal,#type-modal,#import-choice-modal,#edge-pill-hover,#proto-custom-dropdown,.shape-rh,.cshape-del,.ctextblock-del,.ctextblock-toolbar');
+  const interactive=e.target.closest('.node,.cshape,.ctextblock,.ibtn,.port,.resize-handle,.el-wrap,.fb-dropdown,.ms-dropdown,.modal,.tbbtn,#zoom-controls,#connect-hint,#empty-state,#conn-popup,#save-menu,#slots-modal,#edge-modal,#type-modal,#import-choice-modal,#edge-pill-hover,#proto-custom-dropdown,.shape-rh,.cshape-del,.ctextblock-del,.ctextblock-toolbar,#focus-chips,#edge-toolbar');
   if(interactive)return;
 
   if(connectMode){ exitConnectMode(); return; }
-  if(viewMode){ clearViewFocus(); return; }
   if(e.target.closest&&e.target.closest('#svg-layer')&&e.target.tagName==='path') return;
 
   if(!drawMode){
@@ -1680,6 +1821,7 @@ function showNodeProps(id){
     <div class="pg"><div class="pl">EAI</div><input id="pp-eai" class="pi" value="${esc(node.eai||'')}" placeholder="EAI identifier…"></div>
     <div class="pg"><div class="pl">COE 1 Date</div><input id="pp-coe1" class="pi" type="date" value="${esc(node.coe1||'')}"></div>
     <div class="pg"><div class="pl">COE 2 Date</div><input id="pp-coe2" class="pi" type="date" value="${esc(node.coe2||'')}"></div>
+    <div class="pg"><div class="pl">COE 3 Date</div><input id="pp-coe3" class="pi" type="date" value="${esc(node.coe3||'')}"></div>
     <div class="pg"><div class="pl">Tech Flag(s)</div><div id="pp-techflags-wrap"></div></div>
     <div class="pg"><div class="pl">Color</div><div class="cr" id="pp-colors">${swatches}</div></div>
     <div class="pg"><button class="sbtn" onclick="openEditTypeModal('${node.type}')">✎ Edit type "${esc(nt?nt.label:'')}"</button>
@@ -1720,6 +1862,9 @@ function showNodeProps(id){
   });
   document.getElementById('pp-coe2').addEventListener('change',function(){
     if(selNode){nodes[selNode].coe2=this.value;renderNode(nodes[selNode],true);}
+  });
+  document.getElementById('pp-coe3').addEventListener('change',function(){
+    if(selNode){nodes[selNode].coe3=this.value;renderNode(nodes[selNode],true);}
   });
   document.getElementById('pp-colors').addEventListener('click',e=>{
     const sw=e.target.closest('.csw');if(!sw||!selNode)return;
@@ -1896,7 +2041,9 @@ function deleteShape(id){
 function renderShapes(){
   const sl=document.getElementById('shapes-layer');
   sl.style.pointerEvents='all';
-  shapes.forEach(s=>{
+  // Sort by zOrder so higher values render on top
+  const sorted=[...shapes].sort((a,b)=>(a.zOrder||0)-(b.zOrder||0));
+  sorted.forEach(s=>{
     let el=sl.querySelector(`.cshape[data-id="${s.id}"]`);
     if(!el){
       el=document.createElement('div');el.className='cshape';el.dataset.id=s.id;
@@ -1905,6 +2052,7 @@ function renderShapes(){
       const delBtn=document.createElement('button');
       delBtn.className='cshape-del';delBtn.title='Delete shape';delBtn.textContent='×';
       delBtn.addEventListener('click',e=>{e.stopPropagation();deleteShape(s.id);});
+      el.addEventListener('contextmenu',e=>openCtxMenu(e,'shape',s.id));
       el.appendChild(delBtn);
 
       // Resize handles
@@ -2162,38 +2310,139 @@ function nodeCenter(id){
   return{x:n.x+el.offsetWidth/2, y:n.y+el.offsetHeight/2};
 }
 function nodeEdgePt(fId,tId){
-  const n=nodes[fId],el=document.getElementById(fId);if(!n||!el)return{x:0,y:0};
+  const n=nodes[fId];if(!n)return{x:0,y:0};
   const fc=nodeCenter(fId),tc=nodeCenter(tId);
   const dx=tc.x-fc.x,dy=tc.y-fc.y,angle=Math.atan2(dy,dx);
-  const hw=el.offsetWidth/2,hh=el.offsetHeight/2;
-  const t=(Math.abs(Math.cos(angle))*hh<=Math.abs(Math.sin(angle))*hw)?hh/(Math.abs(Math.sin(angle))+1e-9):hw/(Math.abs(Math.cos(angle))+1e-9);
+  const w=(n.w||160)/2,h=(n.h||120)/2;
+  const t=(Math.abs(Math.cos(angle))*h<=Math.abs(Math.sin(angle))*w)?h/(Math.abs(Math.sin(angle))+1e-9):w/(Math.abs(Math.cos(angle))+1e-9);
   return{x:fc.x+t*Math.cos(angle),y:fc.y+t*Math.sin(angle)};
 }
+
+function snapToNodePerimeter(n,p){
+  // Clamp the point to the nearest position on the node's border
+  const w=n.w||160, h=n.h||120;
+  const cx=n.x+w/2, cy=n.y+h/2;
+  const dx=p.x-cx, dy=p.y-cy;
+  // Find which edge of the rect is closest to p
+  // Project ray from center through p, find intersection with rect
+  const scaleX=dx===0?Infinity:w/2/Math.abs(dx);
+  const scaleY=dy===0?Infinity:h/2/Math.abs(dy);
+  const s=Math.min(scaleX,scaleY);
+  let px=cx+dx*s, py=cy+dy*s;
+  // Clamp to node edges
+  px=Math.max(n.x,Math.min(n.x+w,px));
+  py=Math.max(n.y,Math.min(n.y+h,py));
+  // Apply grid snap along the perimeter
+  if(snapEnabled){
+    // Snap the free axis (the one not on the border)
+    const onLeft=Math.abs(px-n.x)<1, onRight=Math.abs(px-(n.x+w))<1;
+    const onTop=Math.abs(py-n.y)<1, onBottom=Math.abs(py-(n.y+h))<1;
+    if(onLeft||onRight) py=Math.max(n.y,Math.min(n.y+h,snapPt(py)));
+    if(onTop||onBottom) px=Math.max(n.x,Math.min(n.x+w,snapPt(px)));
+  }
+  return {x:px, y:py};
+}
+
+function closestEdgePts(nFrom,nTo){
+  // Returns {from,to} as the closest pair of cardinal edge midpoints between two nodes
+  const fW=nFrom.w||160,fH=nFrom.h||120;
+  const tW=nTo.w||160,tH=nTo.h||120;
+  const fSides=[
+    {x:nFrom.x+fW/2, y:nFrom.y,      label:'top'},
+    {x:nFrom.x+fW/2, y:nFrom.y+fH,   label:'bottom'},
+    {x:nFrom.x,       y:nFrom.y+fH/2, label:'left'},
+    {x:nFrom.x+fW,    y:nFrom.y+fH/2, label:'right'},
+  ];
+  const tSides=[
+    {x:nTo.x+tW/2, y:nTo.y,      label:'top'},
+    {x:nTo.x+tW/2, y:nTo.y+tH,   label:'bottom'},
+    {x:nTo.x,       y:nTo.y+tH/2, label:'left'},
+    {x:nTo.x+tW,    y:nTo.y+tH/2, label:'right'},
+  ];
+  let best=null,bestDist=Infinity;
+  fSides.forEach(f=>tSides.forEach(t=>{
+    const d=Math.hypot(t.x-f.x,t.y-f.y);
+    if(d<bestDist){bestDist=d;best={f,t};}
+  }));
+  return best;
+}
+function nodesOverlap(a,b){
+  if(!a||!b)return false;
+  return a.x<b.x+(b.w||160)&&a.x+(a.w||160)>b.x&&a.y<b.y+(b.h||120)&&a.y+(a.h||120)>b.y;
+}
+
+function edgePassesOverAnyNode(fromPt,toPt,cx,cy,fromId,toId){
+  // Check if any third node meaningfully overlaps the quadratic bezier path
+  return Object.values(nodes).some(n=>{
+    if(n.id===fromId||n.id===toId)return false;
+    const nW=n.w||160, nH=n.h||120;
+    // Sample points along the bezier curve and check if any fall inside this node
+    for(let t=0.1;t<=0.9;t+=0.1){
+      const bx=(1-t)*(1-t)*fromPt.x+2*(1-t)*t*cx+t*t*toPt.x;
+      const by=(1-t)*(1-t)*fromPt.y+2*(1-t)*t*cy+t*t*toPt.y;
+      if(bx>n.x&&bx<n.x+nW&&by>n.y&&by<n.y+nH)return true;
+    }
+    return false;
+  });
+}
+
 function redrawEdges(){
-  // If filters are active, delegate to filtered version
   const anyActive=viewFilters.portfolio.size||viewFilters.eai.size||viewFilters.techFlags.size||viewFilters.coe.size;
   if(anyActive){ applyViewFilters(); return; }
   const layer=document.getElementById('edges-layer');
+  const layerTop=document.getElementById('edges-layer-top');
   const ll=document.getElementById('edge-labels-layer');
-  layer.innerHTML='';ll.innerHTML='';
+  layer.innerHTML=''; layerTop.innerHTML=''; ll.innerHTML='';
   edges.forEach(edge=>{
-    const from=nodeEdgePt(edge.from,edge.to),to=nodeEdgePt(edge.to,edge.from);
-    const dx=to.x-from.x,dy=to.y-from.y,dist=Math.sqrt(dx*dx+dy*dy)+1e-9;
-    const curve=Math.min(60,dist*.3),nx=-dy/dist,ny=dx/dist;
-    const cx=((from.x+to.x)/2)+nx*curve,cy=((from.y+to.y)/2)+ny*curve;
-    const d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    const nFrom=nodes[edge.from], nTo=nodes[edge.to];
     const isSel=selEdge===edge.id;
     const txt2=edge.label||edge.protocol||'+ label';
+    const pts=closestEdgePts(nFrom,nTo);
+    const fromPt=edge.fromPtX!==undefined?{x:edge.fromPtX,y:edge.fromPtY}:pts.f;
+    const toPt=edge.toPtX!==undefined?{x:edge.toPtX,y:edge.toPtY}:pts.t;
+    // Compute default cx/cy for overlap check
+    const _dx=toPt.x-fromPt.x,_dy=toPt.y-fromPt.y,_dist=Math.hypot(_dx,_dy)+1e-9;
+    const _curve=_dist<80?0:Math.min(30,_dist*.1),_nx=-_dy/_dist,_ny=_dx/_dist;
+    const _cx=edge.cpX!==undefined?edge.cpX:((fromPt.x+toPt.x)/2)+_nx*_curve;
+    const _cy=edge.cpY!==undefined?edge.cpY:((fromPt.y+toPt.y)/2)+_ny*_curve;
+    const useTopLayer=edgesOnTop||edge._forceTop||nodesOverlap(nFrom,nTo)||edgePassesOverAnyNode(fromPt,toPt,_cx,_cy,edge.from,edge.to);
+    const targetLayer=useTopLayer?layerTop:layer;
+    const markerId=useTopLayer?(isSel?'ah-top-sel':'ah-top'):(isSel?'ah-sel':'ah');
 
-    // Visible path only — no hit paths needed (we use mousemove hit-test instead)
+    let from, to, d, cx, cy;
+    if(nFrom&&nTo){
+      from=fromPt; to=toPt;
+      if(edge.cpX!==undefined){ cx=edge.cpX; cy=edge.cpY; }
+      else if(useTopLayer&&nodesOverlap(nFrom,nTo)){
+        const dx=to.x-from.x, dy=to.y-from.y, dist=Math.hypot(dx,dy)+1e-9;
+        const nx=-dy/dist, ny=dx/dist;
+        const curveAmt=Math.max(50,(nFrom.w||160)*0.6);
+        cx=((from.x+to.x)/2)+nx*curveAmt; cy=((from.y+to.y)/2)+ny*curveAmt;
+      } else {
+        const dx=to.x-from.x,dy=to.y-from.y,dist=Math.hypot(dx,dy)+1e-9;
+        const curve=dist<80?0:Math.min(30,dist*.1),nx=-dy/dist,ny=dx/dist;
+        cx=((from.x+to.x)/2)+nx*curve; cy=((from.y+to.y)/2)+ny*curve;
+      }
+      d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    } else {
+      from=nodeEdgePt(edge.from,edge.to); to=nodeEdgePt(edge.to,edge.from);
+      const dx=to.x-from.x,dy=to.y-from.y,dist=Math.hypot(dx,dy)+1e-9;
+      const curve=dist<80?0:Math.min(30,dist*.1),nx=-dy/dist,ny=dx/dist;
+      cx=((from.x+to.x)/2)+nx*curve; cy=((from.y+to.y)/2)+ny*curve;
+      d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    }
+
+    // Store computed points for handle dragging
+    edge._from=from; edge._to=to; edge._cx=cx; edge._cy=cy;
+
     const vis=document.createElementNS('http://www.w3.org/2000/svg','path');
     vis.setAttribute('d',d);
     vis.setAttribute('fill','none');
     vis.setAttribute('stroke',isSel?'#5B4CF5':'#9ca3af');
     vis.setAttribute('stroke-width',isSel?'2.5':'1.5');
-    vis.setAttribute('marker-end',`url(#${isSel?'ah-sel':'ah'})`);
+    vis.setAttribute('marker-end',`url(#${markerId})`);
     vis.dataset.edgeId=edge.id;
-    layer.appendChild(vis);
+    targetLayer.appendChild(vis);
 
     // Label pill (clickable, inside edge-labels-layer which inherits canvas transform)
     const lx=(from.x+2*cx+to.x)/4, ly=(from.y+2*cy+to.y)/4;
@@ -2204,9 +2453,43 @@ function redrawEdges(){
     const pill=document.createElement('div');
     pill.className='el-pill'+(isSel?' sel':'');
     pill.textContent=txt2.length>24?txt2.slice(0,24)+'…':txt2;
-    wrap.addEventListener('click',e=>{ e.stopPropagation(); openEdgeModal(edge.id); });
+    wrap.addEventListener('click',e=>{ e.stopPropagation(); selectEdge(edge.id); });
+    wrap.addEventListener('contextmenu',e=>{ e.stopPropagation(); openCtxMenu(e,'edge',edge.id); });
     wrap.appendChild(pill); ll.appendChild(wrap);
   });
+
+  // Render handles for selected edge
+  renderEdgeHandles();
+  // Re-apply focus overlay if in focus mode
+  if(viewMode&&focusNodeId&&!_applyingFocus) applyViewFocus(focusNodeId);
+}
+
+function renderEdgeHandles(){
+  const eh=document.getElementById('edge-handles');
+  eh.innerHTML='';
+  if(!selEdge)return;
+  const edge=edges.find(e=>e.id===selEdge);
+  if(!edge||!edge._from)return;
+  const {_from:f,_to:t,_cx:cx,_cy:cy}=edge;
+
+  function makeHandle(x,y,kind){
+    const h=document.createElement('div');
+    h.className='edge-handle '+(kind==='cp'?'cp':'ep');
+    h.style.left=x+'px'; h.style.top=y+'px';
+    h.addEventListener('mousedown',e=>{
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      draggingEdgeHandle={edgeId:selEdge,kind};
+      document.body.style.cursor='move';
+    },true); // capture phase so it fires before canvas pan handler
+    eh.appendChild(h);
+  }
+  // Control point handle (midpoint of curve)
+  makeHandle(cx,cy,'cp');
+  // Endpoint handles
+  makeHandle(f.x,f.y,'from');
+  makeHandle(t.x,t.y,'to');
 }
 
 // ── Edge hover via mousemove hit-testing ──────────────────────────────────────
@@ -2217,22 +2500,23 @@ function initEdgeHover(){
 
   cw.addEventListener('mousemove',e=>{
     if(dragging||resizing||rubberBanding||panning||connectMode||drawMode)return;
-    // Skip if over a node or UI element
-    const overNode=e.target.closest('.node,.el-wrap,.ibtn,.port,.resize-handle,.cshape,.ctextblock');
-    if(overNode){ clearEdgeHover(); return; }
+    // Skip if over a node or UI element (but NOT over nodes when top-layer edges are above)
+    const overUI=e.target.closest('.el-wrap,.ibtn,.port,.resize-handle,.cshape,.ctextblock,.edge-handle');
+    if(overUI){ clearEdgeHover(); return; }
 
+    // Check both normal and top edge layers
     const layer=document.getElementById('edges-layer');
+    const layerTop=document.getElementById('edges-layer-top');
     const svgEl=document.getElementById('svg-layer');
     const svgRect=svgEl.getBoundingClientRect();
-    // Convert mouse to SVG coordinate space (accounts for transform)
     const mx=(e.clientX-svgRect.left)/scale;
     const my=(e.clientY-svgRect.top)/scale;
 
     let found=null;
-    const paths=layer.querySelectorAll('path');
-    for(const path of paths){
+    // Check top layer first (above nodes, so user can hover even over a node)
+    const allPaths=[...layerTop.querySelectorAll('path'),...layer.querySelectorAll('path')];
+    for(const path of allPaths){
       try{
-        // Use a temporary thick stroke for hit testing
         const origSW=path.getAttribute('stroke-width');
         path.setAttribute('stroke-width','12');
         const pt=svgEl.createSVGPoint();
@@ -2247,7 +2531,9 @@ function initEdgeHover(){
       clearEdgeHover();
       if(found){
         hoveredEdgeId=found;
-        const path=layer.querySelector(`path[data-edge-id="${found}"]`);
+        // Check both layers for the path
+        const path=layer.querySelector(`path[data-edge-id="${found}"]`)||
+                   layerTop.querySelector(`path[data-edge-id="${found}"]`);
         if(path){
           path.setAttribute('stroke','#6b7280');
           path.setAttribute('stroke-width','2.5');
@@ -2271,7 +2557,16 @@ function initEdgeHover(){
 
   cw.addEventListener('click',e=>{
     if(!hoveredEdgeId)return;
-    if(e.target.closest('.node,.el-wrap,.ibtn,.port,.resize-handle,.cshape,.ctextblock'))return;
+    // Allow edge click even over a node (top-layer arrows sit above nodes)
+    if(e.target.closest('.el-wrap,.ibtn,.port,.resize-handle,.cshape,.ctextblock,.edge-handle'))return;
+    const eid=hoveredEdgeId;
+    clearEdgeHover();
+    selectEdge(eid);
+  });
+
+  cw.addEventListener('dblclick',e=>{
+    if(!hoveredEdgeId)return;
+    if(e.target.closest('.ibtn,.port,.resize-handle,.cshape,.ctextblock'))return;
     const eid=hoveredEdgeId;
     clearEdgeHover();
     openEdgeModal(eid);
@@ -2281,7 +2576,10 @@ function initEdgeHover(){
 function clearEdgeHover(){
   const hoverPill=document.getElementById('edge-pill-hover');
   if(hoveredEdgeId){
-    const path=document.querySelector(`#edges-layer path[data-edge-id="${hoveredEdgeId}"]`);
+    const layer=document.getElementById('edges-layer');
+    const layerTop=document.getElementById('edges-layer-top');
+    const path=layer.querySelector(`path[data-edge-id="${hoveredEdgeId}"]`)||
+               layerTop.querySelector(`path[data-edge-id="${hoveredEdgeId}"]`);
     if(path){
       const isSel=selEdge===hoveredEdgeId;
       path.setAttribute('stroke',isSel?'#5B4CF5':'#9ca3af');
@@ -2290,23 +2588,79 @@ function clearEdgeHover(){
     hoveredEdgeId=null;
   }
   hoverPill.style.display='none';
-  document.getElementById('canvas-wrap').style.cursor='crosshair';
+  document.getElementById('canvas-wrap').style.cursor='grab';
 }
 
 // ── Edge modal ────────────────────────────────────────────────────────────────
 function openEdgeModal(eid){
-  editEdgeId=eid;selEdge=eid;
+  editEdgeId=eid; selEdge=eid;
   const edge=edges.find(e=>e.id===eid);if(!edge)return;
   document.getElementById('em-label').value=edge.label||'';
   updateProtocolDatalist();
   document.getElementById('em-proto').value=edge.protocol||'';
-  document.getElementById('edge-modal').style.display='flex';redrawEdges();
+  document.getElementById('edge-modal').style.display='flex';
+  redrawEdges();
   // Wire up proto input focus/blur after modal is visible
   const protoInp=document.getElementById('em-proto');
   protoInp.onfocus=()=>openProtoDropdown(protoInp.value, protoInp);
   protoInp.onblur=null;
 }
-function closeEdgeModal(){document.getElementById('edge-modal').style.display='none';closeProtoDropdown();editEdgeId=null;selEdge=null;redrawEdges();}
+
+function selectEdge(eid){
+  // Select edge and show handles WITHOUT opening modal
+  // Close modal if open for a different edge
+  if(editEdgeId&&editEdgeId!==eid) closeEdgeModal();
+  selEdge=eid;
+  redrawEdges();
+  // Show a small floating toolbar near the edge label
+  showEdgeToolbar(eid);
+}
+function showEdgeToolbar(eid){
+  const edge=edges.find(e=>e.id===eid);
+  if(!edge||!edge._from) return;
+  let tb=document.getElementById('edge-toolbar');
+  if(!tb){
+    tb=document.createElement('div');tb.id='edge-toolbar';
+    tb.style.cssText='position:fixed;z-index:800;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.15);display:flex;gap:4px;padding:5px 8px;align-items:center;font-size:12px';
+    document.body.appendChild(tb);
+  }
+  tb.innerHTML=`
+    <span style="color:var(--tx2);font-size:11px;margin-right:4px">${edge.protocol||edge.label||'Connection'}</span>
+    <button onclick="openEdgeModal('${eid}')" style="padding:3px 8px;border-radius:5px;border:none;background:var(--ac);color:#fff;font-size:11px;cursor:pointer">✎ Edit</button>
+    <button onclick="resetEdgeShape()" style="padding:3px 8px;border-radius:5px;border:1px solid var(--bd);background:var(--s2);color:var(--tx2);font-size:11px;cursor:pointer">↺ Reset</button>
+    <button onclick="clearEdgeSelection()" style="padding:3px 8px;border-radius:5px;border:none;background:none;color:var(--tx3);font-size:13px;cursor:pointer">×</button>`;
+  // Position near the edge midpoint on screen
+  const cw=document.getElementById('canvas-wrap').getBoundingClientRect();
+  const sx=edge._cx*scale+panX+cw.left;
+  const sy=edge._cy*scale+panY+cw.top;
+  tb.style.left=Math.min(sx+10,window.innerWidth-220)+'px';
+  tb.style.top=Math.max(sy-40,8)+'px';
+  tb.style.display='flex';
+}
+
+function clearEdgeSelection(){
+  selEdge=null; editEdgeId=null;
+  const tb=document.getElementById('edge-toolbar');
+  if(tb) tb.style.display='none';
+  document.getElementById('edge-handles').innerHTML='';
+  redrawEdges();
+}
+
+function resetEdgeShape(){
+  const edge=edges.find(e=>e.id===editEdgeId);
+  if(!edge)return;
+  delete edge.cpX; delete edge.cpY;
+  delete edge.fromPtX; delete edge.fromPtY;
+  delete edge.toPtX; delete edge.toPtY;
+  redrawEdges();
+}
+function closeEdgeModal(){
+  document.getElementById('edge-modal').style.display='none';
+  closeProtoDropdown();editEdgeId=null;selEdge=null;
+  const tb=document.getElementById('edge-toolbar');if(tb)tb.style.display='none';
+  document.getElementById('edge-handles').innerHTML='';
+  redrawEdges();
+}
 function saveEdge(){
   pushUndo();
   const edge=edges.find(e=>e.id===editEdgeId);
@@ -2440,7 +2794,7 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function copySelection(){
   const ids=selNodes.size>0?[...selNodes]:(selNode?[selNode]:[]);
   const selTextEls=[...document.querySelectorAll('.ctextblock.selected')];
-  clipboard=ids.map(id=>{const n=nodes[id];return{...n,portfolio:[...(n.portfolio||[])],techFlags:[...(n.techFlags||[])],coe1:n.coe1||'',coe2:n.coe2||''};});
+  clipboard=ids.map(id=>{const n=nodes[id];return{...n,portfolio:[...(n.portfolio||[])],techFlags:[...(n.techFlags||[])],coe1:n.coe1||'',coe2:n.coe2||'',coe3:n.coe3||''};});
   clipboard._texts=selTextEls.map(el=>{const t=texts.find(t=>t.id===el.dataset.id);return t?{...t}:null;}).filter(Boolean);
 }
 
@@ -2468,11 +2822,20 @@ function onKeyDown(e){
   }
   if(e.key==='Escape'){
     if(_mergePreview){cancelMergePreview();return;}
+    if(selEdge&&!editEdgeId){clearEdgeSelection();return;}
     if(lassoMode){toggleLasso();return;}
     if(viewMode){toggleViewMode();return;}
     exitConnectMode();closeEdgeModal();closeConnPopup();clearDrawMode();clearSelection();hideProps();
   }
   if((e.key==='Delete'||e.key==='Backspace')&&!e.target.closest('input,textarea,[contenteditable]')){
+    // Delete selected edge first
+    if(selEdge&&!editEdgeId){
+      pushUndo();
+      edges=edges.filter(ed=>ed.id!==selEdge);
+      clearEdgeSelection();
+      redrawEdges();
+      return;
+    }
     const selTexts=document.querySelectorAll('.ctextblock.selected');
     const selShapes=document.querySelectorAll('.cshape.selected');
     const hasAny=selTexts.length||selShapes.length||selNodes.size||selNode;
@@ -2622,6 +2985,7 @@ function openConnPopup(nodeId, evt){
   if(node.portfolio&&node.portfolio.length) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">Portfolio</div><div class="cp-attr-val">${esc(node.portfolio.join(', '))}</div></div>`;
   if(node.coe1) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">COE 1</div><div class="cp-attr-val">${esc(node.coe1)}</div></div>`;
   if(node.coe2) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">COE 2</div><div class="cp-attr-val">${esc(node.coe2)}</div></div>`;
+  if(node.coe3) ahtml+=`<div class="cp-attr"><div class="cp-attr-label">COE 3</div><div class="cp-attr-val">${esc(node.coe3)}</div></div>`;
   if(node.techFlags&&node.techFlags.length) ahtml+=`<div class="cp-attr" style="flex-basis:100%"><div class="cp-attr-label">Tech Flags</div><div class="cp-attr-val" style="white-space:normal;line-height:1.5">${esc(node.techFlags.join(' · '))}</div></div>`;
   document.getElementById('cp-attrs').innerHTML=ahtml?`<div class="cp-attrs" style="flex-wrap:wrap">${ahtml}</div>`:'';
 
@@ -2744,14 +3108,19 @@ function renderCpBody(){
       }
       function buildNode(id, visited){
         const childEdges=getChildEdges(id);
-        const children=[];
+        // Group edges by target node so multiple connections show as one branch
+        const grouped={};
         childEdges.forEach(edge=>{
           const childId=direction==='out'?edge.to:edge.from;
-          if(visited.has(childId))return; // avoid cycles only
-          const newVisited=new Set(visited);newVisited.add(childId);
-          children.push({id:childId,edge,children:buildNode(childId,newVisited)});
+          if(visited.has(childId))return;
+          if(!grouped[childId]) grouped[childId]={id:childId,edges:[],children:null};
+          grouped[childId].edges.push(edge);
         });
-        return children;
+        return Object.values(grouped).map(g=>{
+          const newVisited=new Set(visited);newVisited.add(g.id);
+          g.children=buildNode(g.id,newVisited);
+          return g;
+        });
       }
       const initial=new Set([startId]);
       return buildNode(startId,initial);
@@ -2764,9 +3133,9 @@ function renderCpBody(){
         const nt=getType(other?.type);
         if(!other||!nt)return;
         if(!cpActiveTypes.has(other.type))return;
-        const edge=branch.edge;
-        const proto=edge?.protocol||'';
-        const edgeId=edge?.id||'';
+        // Use first edge for hop/direction info, show all protocols
+        const primaryEdge=branch.edges[0];
+        const edgeId=primaryEdge?.id||'';
         const hopNum=depth+1;
         const isDir=hopNum===1;
         const arrowColor=isDir?'var(--ac)':'#a78bfa';
@@ -2780,9 +3149,17 @@ function renderCpBody(){
         const hasChildren=branch.children&&branch.children.length>0;
         const childId='cpc-'+depth+'-'+idx+'-'+branch.id;
 
+        // Build protocol pills for all connections to this node
+        const protoPills=branch.edges.map(e=>{
+          const proto=e.protocol||e.label||'';
+          return `<span onclick="event.stopPropagation();openEdgeModal('${e.id}');closeConnPopup()"
+            style="display:inline-block;background:var(--ac-l);color:var(--ac);border-radius:4px;padding:1px 7px;font-size:9px;font-weight:600;cursor:pointer;margin:1px 2px 1px 0;white-space:nowrap"
+            title="Click to edit this connection">${proto||'connection'}</span>`;
+        }).join('');
+
         html+=`<div>
           <div class="cp-erow" style="padding-left:${indentPx}px;align-items:flex-start;${crossPortfolio?'background:rgba(14,165,233,.07);border-radius:6px;margin:1px 0':''}"
-            onclick="${hasChildren?`cpToggleRow('${childId}',this);`:''}${edgeId&&!hasChildren?`openEdgeModal('${edgeId}');closeConnPopup()`:''}" >
+            onclick="${hasChildren?`cpToggleRow('${childId}',this);`:''}">
             <div class="cp-earr" style="color:${arrowColor};font-size:13px">${arrowSym}</div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
@@ -2792,7 +3169,7 @@ function renderCpBody(){
                 ${showPortfolios.length?`<span style="font-size:9px;background:#bae6fd;color:#0369a1;border-radius:4px;padding:1px 5px;font-weight:600;flex-shrink:0">${esc(showPortfolios.join(', '))}</span>`:''}
                 ${hasChildren?`<span class="cp-collapse-btn">−</span>`:''}
               </div>
-              ${proto?`<div style="font-size:9px;color:var(--tx3);margin-top:2px;margin-left:21px">via ${esc(proto)}</div>`:''}
+              <div style="margin-top:3px;margin-left:21px;line-height:1.8">${protoPills}</div>
             </div>
           </div>
           ${hasChildren?`<div id="${childId}">${renderBranch(branch.children,depth+1)}</div>`:''}
@@ -2850,7 +3227,7 @@ function buildConnPopupData(){
   return{
     name:node.label, type:nt?.label||node.type, subtitle:node.subtitle||'',
     eai:node.eai||'', portfolio:(node.portfolio||[]).join(', '),
-    coe1:node.coe1||'', coe2:node.coe2||'',
+    coe1:node.coe1||'', coe2:node.coe2||'', coe3:node.coe3||'',
     techFlags:(node.techFlags||[]).join(', '),
     outbound:outList.sort((a,b)=>a.hops-b.hops),
     inbound:incList.sort((a,b)=>a.hops-b.hops),
@@ -2915,7 +3292,7 @@ function downloadImportTemplate(){
 
   // ── Sheet 1: Update template ──
   const data=[
-    ['EAI','Tech Flags (comma-separated)','COE 1 (YYYY-MM-DD)','COE 2 (YYYY-MM-DD)'],
+    ['EAI','Tech Flags (comma-separated)','COE 1 (YYYY-MM-DD)','COE 2 (YYYY-MM-DD)','COE 3 (YYYY-MM-DD)'],
     ['EAI-001','CICD, VMWare','2026-09-01','2026-12-01'],
     ['EAI-002','API Integration Usage','2026-10-15',''],
   ];
@@ -2960,13 +3337,13 @@ function downloadImportTemplate(){
   XLSX.utils.book_append_sheet(wb,ws2,'Valid Tech Flags');
 
   // ── Sheet 3: Current EAIs in diagram ──
-  const eaiRows=[['EAI','App Name','Current Portfolio','Current Tech Flags','Current COE 1','Current COE 2']];
+  const eaiRows=[['EAI','App Name','Current Portfolio','Current Tech Flags','Current COE 1','Current COE 2','Current COE 3']];
   Object.values(nodes).filter(n=>n.eai).forEach(n=>{
     eaiRows.push([
       n.eai, n.label,
       (n.portfolio||[]).join(', '),
       (n.techFlags||[]).join(', '),
-      n.coe1||'', n.coe2||''
+      n.coe1||'', n.coe2||'', n.coe3||''
     ]);
   });
   if(eaiRows.length===1) eaiRows.push(['(No nodes with EAI found in diagram)','','','','','']);
@@ -3000,6 +3377,7 @@ function bulkImportFromFile(e){
       const flagCol=colMap['techflags']||colMap['flags']||colMap['techflag'];
       const coe1Col=colMap['coe1']||colMap['coedateone']||colMap['coefirst'];
       const coe2Col=colMap['coe2']||colMap['coedatetwo']||colMap['coesecond'];
+      const coe3Col=colMap['coe3']||colMap['coedatethree']||colMap['coethird'];
 
       if(!eaiCol){
         const found=Object.keys(rows[0]).join(', ');
@@ -3036,6 +3414,11 @@ function bulkImportFromFile(e){
           if(coe2Col&&row[coe2Col]!==undefined&&row[coe2Col]!==''){
             const d=parseExcelDate(row[coe2Col]);
             if(d) node.coe2=d;
+          }
+          // COE 3
+          if(coe3Col&&row[coe3Col]!==undefined&&row[coe3Col]!==''){
+            const d=parseExcelDate(row[coe3Col]);
+            if(d) node.coe3=d;
           }
           renderNode(node,true);
           updated++;
@@ -3214,6 +3597,7 @@ function buildFbCoeDropdown(){
   Object.values(nodes).forEach(n=>{
     if(n.coe1) dateSet.add(n.coe1);
     if(n.coe2) dateSet.add(n.coe2);
+    if(n.coe3) dateSet.add(n.coe3);
   });
   const options=[...dateSet].sort();
 
@@ -3283,8 +3667,102 @@ function closeAllFbDropdowns(){
   document.querySelectorAll('.fb-chevron.open').forEach(c=>c.classList.remove('open'));
 }
 
+function renderPortfolioOverlay(dimmedNodeIds){
+  const overlay=document.getElementById('portfolio-overlay');
+  overlay.innerHTML='';
+  if(!dimmedNodeIds||!dimmedNodeIds.size)return;
+  const PAD=GRID;
+  const ns='http://www.w3.org/2000/svg';
+
+  // Group by portfolio label first
+  const byPortfolio={};
+  dimmedNodeIds.forEach(id=>{
+    const n=nodes[id];if(!n)return;
+    const key=(n.portfolio&&n.portfolio.length)?n.portfolio.join(', '):'Other Portfolio';
+    if(!byPortfolio[key]) byPortfolio[key]=[];
+    byPortfolio[key].push(n);
+  });
+
+  const colors=['rgba(14,165,233,.10)','rgba(236,72,153,.10)','rgba(234,179,8,.10)','rgba(22,163,74,.10)','rgba(139,92,246,.10)','rgba(249,115,22,.10)'];
+  const strokes=['#0ea5e9','#ec4899','#eab308','#16a34a','#8b5cf6','#f97316'];
+
+  // Cluster nodes within each portfolio group by proximity
+  // Two nodes are in the same cluster if their bounding boxes (with PAD) overlap
+  function clusterNodes(group){
+    const clusters=[];
+    group.forEach(n=>{
+      // Check if n overlaps any existing cluster's bounding box
+      let placed=false;
+      for(const cl of clusters){
+        let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        cl.forEach(m=>{
+          minX=Math.min(minX,m.x-PAD*2); minY=Math.min(minY,m.y-PAD*2);
+          maxX=Math.max(maxX,m.x+(m.w||160)+PAD*2); maxY=Math.max(maxY,m.y+(m.h||120)+PAD*2);
+        });
+        if(n.x<maxX&&n.x+(n.w||160)>minX&&n.y<maxY&&n.y+(n.h||120)>minY){
+          cl.push(n); placed=true; break;
+        }
+      }
+      if(!placed) clusters.push([n]);
+    });
+    // Merge clusters that now overlap each other (iterate until stable)
+    let changed=true;
+    while(changed){
+      changed=false;
+      outer: for(let i=0;i<clusters.length;i++){
+        for(let j=i+1;j<clusters.length;j++){
+          const bbox=(cl)=>{
+            let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+            cl.forEach(m=>{x0=Math.min(x0,m.x-PAD*2);y0=Math.min(y0,m.y-PAD*2);x1=Math.max(x1,m.x+(m.w||160)+PAD*2);y1=Math.max(y1,m.y+(m.h||120)+PAD*2);});
+            return{x0,y0,x1,y1};
+          };
+          const a=bbox(clusters[i]),b=bbox(clusters[j]);
+          if(a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0){
+            clusters[i]=[...clusters[i],...clusters[j]];
+            clusters.splice(j,1);
+            changed=true; break outer;
+          }
+        }
+      }
+    }
+    return clusters;
+  }
+
+  Object.entries(byPortfolio).forEach(([label,group],i)=>{
+    const clusters=clusterNodes(group);
+    const stroke=strokes[i%strokes.length];
+    const fill=colors[i%colors.length];
+
+    clusters.forEach(cluster=>{
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      cluster.forEach(n=>{
+        minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);
+        maxX=Math.max(maxX,n.x+(n.w||160));maxY=Math.max(maxY,n.y+(n.h||120));
+      });
+      const rect=document.createElementNS(ns,'rect');
+      rect.setAttribute('x',minX-PAD);rect.setAttribute('y',minY-PAD);
+      rect.setAttribute('width',maxX-minX+PAD*2);rect.setAttribute('height',maxY-minY+PAD*2);
+      rect.setAttribute('rx','14');rect.setAttribute('fill',fill);
+      rect.setAttribute('stroke',stroke);rect.setAttribute('stroke-width','2');
+      rect.setAttribute('stroke-dasharray','8 4');
+      overlay.appendChild(rect);
+      // Label badge
+      const fo=document.createElementNS(ns,'foreignObject');
+      fo.setAttribute('x',minX-PAD+8);fo.setAttribute('y',minY-PAD-20);
+      fo.setAttribute('width','200');fo.setAttribute('height','22');
+      fo.innerHTML=`<div xmlns="http://www.w3.org/1999/xhtml" style="display:inline-block;background:${stroke};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;font-family:sans-serif;white-space:nowrap">${label}</div>`;
+      overlay.appendChild(fo);
+    });
+  });
+}
+
+function clearPortfolioOverlay(){
+  document.getElementById('portfolio-overlay').innerHTML='';
+}
+
 function clearViewFilters(){
   viewFilters.portfolio.clear();viewFilters.eai.clear();viewFilters.techFlags.clear();viewFilters.coe.clear();
+  clearPortfolioOverlay();
   initFilterBar();applyViewFilters();
 }
 
@@ -3300,6 +3778,7 @@ function applyViewFilters(){
     document.querySelectorAll('.node').forEach(n=>{n.classList.remove('flt-hidden','flt-dim');});
     document.getElementById('edges-layer').style.opacity='';
     document.getElementById('edge-labels-layer').style.opacity='';
+    clearPortfolioOverlay();
     redrawEdges();
     return;
   }
@@ -3311,7 +3790,7 @@ function applyViewFilters(){
     const portfolioOk=!pf.size||[...(n.portfolio||[])].some(p=>pf.has(p));
     const eaiOk=!ef.size||ef.has(n.eai||'');
     const tfOk=!tf.size||[...(n.techFlags||[])].some(f=>tf.has(f));
-    const coeOk=!cf.size||cf.has(n.coe1||'')||cf.has(n.coe2||'');
+    const coeOk=!cf.size||cf.has(n.coe1||'')||cf.has(n.coe2||'')||cf.has(n.coe3||'');
     if(portfolioOk&&eaiOk&&tfOk&&coeOk) passing.add(n.id);
     if(portfolioOk) portfolioOnly.add(n.id);
   });
@@ -3322,62 +3801,107 @@ function applyViewFilters(){
   const portfolioFilterActive=pf.size>0;
   const strictFiltersActive=ef.size>0||tf.size>0||cf.size>0;
 
+  const dimmedIds=new Set();
+  // First pass: find direct connections to passing nodes
+  Object.keys(nodes).forEach(id=>{
+    if(passing.has(id))return;
+    const connects=edges.some(e=>(e.from===id&&passing.has(e.to))||(e.to===id&&passing.has(e.from)));
+    if(connects) dimmedIds.add(id);
+  });
+  // Follow the full chain from dimmed nodes outward
+  let changed=true;
+  while(changed){
+    changed=false;
+    Object.keys(nodes).forEach(id=>{
+      if(passing.has(id)||dimmedIds.has(id))return;
+      const connects=edges.some(e=>(e.from===id&&dimmedIds.has(e.to))||(e.to===id&&dimmedIds.has(e.from)));
+      if(connects){dimmedIds.add(id);changed=true;}
+    });
+  }
+
   Object.keys(nodes).forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     el.classList.remove('flt-hidden','flt-dim');
-    if(passing.has(id))return; // passes all — show normally
+    if(passing.has(id))return;
 
     if(strictFiltersActive){
-      // EAI or TechFlags active — always fully hide non-passing nodes
       el.classList.add('flt-hidden');
     } else if(portfolioFilterActive){
-      // Portfolio only — dim if connected to a passing node, else hide
-      const connects=edges.some(e=>(e.from===id&&passing.has(e.to))||(e.to===id&&passing.has(e.from)));
-      if(connects) el.classList.add('flt-dim');
+      if(dimmedIds.has(id)) el.classList.add('flt-dim');
       else el.classList.add('flt-hidden');
     } else {
       el.classList.add('flt-hidden');
     }
   });
 
-  // Re-draw edges with filter-aware opacity
-  redrawEdgesFiltered(passing);
+  if(portfolioFilterActive&&!strictFiltersActive) renderPortfolioOverlay(dimmedIds);
+  else clearPortfolioOverlay();
+
+  redrawEdgesFiltered(passing, dimmedIds);
 }
 
-function redrawEdgesFiltered(passing){
+function redrawEdgesFiltered(passing, dimmed){
   const layer=document.getElementById('edges-layer');
+  const layerTop=document.getElementById('edges-layer-top');
   const ll=document.getElementById('edge-labels-layer');
-  layer.innerHTML='';ll.innerHTML='';
+  layer.innerHTML=''; layerTop.innerHTML=''; ll.innerHTML='';
+  // Visible = passing (in-portfolio) OR dimmed (cross-portfolio connected)
+  const visible=new Set([...passing,...(dimmed||[])]);
   edges.forEach(edge=>{
-    const from=nodeEdgePt(edge.from,edge.to),to=nodeEdgePt(edge.to,edge.from);
-    const dx=to.x-from.x,dy=to.y-from.y,dist=Math.sqrt(dx*dx+dy*dy)+1e-9;
-    const curve=Math.min(60,dist*.3),nx=-dy/dist,ny=dx/dist;
-    const cx=((from.x+to.x)/2)+nx*curve,cy=((from.y+to.y)/2)+ny*curve;
-    const d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    const nFrom=nodes[edge.from],nTo=nodes[edge.to];
     const isSel=selEdge===edge.id;
+    const bothVisible=visible.has(edge.from)&&visible.has(edge.to);
     const bothPass=passing.has(edge.from)&&passing.has(edge.to);
-    const eitherPass=passing.has(edge.from)||passing.has(edge.to);
-    const opacity=bothPass?1:eitherPass?0.18:0;
-    if(opacity===0)return;
+    if(!bothVisible)return; // completely hide edges where either endpoint is hidden
+    const opacity=1;
+    const isCross=!bothPass; // cross-portfolio edge
+
+    // Use same path logic as redrawEdges (respects custom overrides + top layer)
+    let from,to,cx,cy,d;
+    if(nFrom&&nTo){
+      const pts=closestEdgePts(nFrom,nTo);
+      from=edge.fromPtX!==undefined?{x:edge.fromPtX,y:edge.fromPtY}:pts.f;
+      to=edge.toPtX!==undefined?{x:edge.toPtX,y:edge.toPtY}:pts.t;
+      const _dx=to.x-from.x,_dy=to.y-from.y,_dist=Math.hypot(_dx,_dy)+1e-9;
+      const _curve=_dist<80?0:Math.min(30,_dist*.1),_nx=-_dy/_dist,_ny=_dx/_dist;
+      const _cx=edge.cpX!==undefined?edge.cpX:((from.x+to.x)/2)+_nx*_curve;
+      const _cy=edge.cpY!==undefined?edge.cpY:((from.y+to.y)/2)+_ny*_curve;
+      cx=_cx; cy=_cy;
+      d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    } else {
+      from=nodeEdgePt(edge.from,edge.to); to=nodeEdgePt(edge.to,edge.from);
+      const dx=to.x-from.x,dy=to.y-from.y,dist=Math.hypot(dx,dy)+1e-9;
+      const curve=dist<80?0:Math.min(30,dist*.1),nx=-dy/dist,ny=dx/dist;
+      cx=((from.x+to.x)/2)+nx*curve; cy=((from.y+to.y)/2)+ny*curve;
+      d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
+    }
+
+    const useTopLayer=edgesOnTop||edge._forceTop||nodesOverlap(nFrom,nTo)||
+      (nFrom&&nTo&&edgePassesOverAnyNode(from,to,cx,cy,edge.from,edge.to));
+    const targetLayer=useTopLayer?layerTop:layer;
+    const markerId=useTopLayer?(isSel?'ah-top-sel':'ah-top'):(isSel?'ah-sel':'ah');
 
     const txt2=edge.label||edge.protocol||'+ label';
     const vis=document.createElementNS('http://www.w3.org/2000/svg','path');
     vis.setAttribute('d',d);vis.setAttribute('fill','none');
-    vis.setAttribute('stroke',bothPass?(isSel?'#5B4CF5':'#9ca3af'):'#d1d5db');
-    vis.setAttribute('stroke-width',isSel&&bothPass?'2.5':'1.5');
-    if(bothPass) vis.setAttribute('marker-end',`url(#${isSel?'ah-sel':'ah'})`);
-    vis.style.opacity=String(opacity);
-    if(bothPass) vis.dataset.edgeId=edge.id;
-    layer.appendChild(vis);
+    vis.setAttribute('stroke',isSel?'#5B4CF5':isCross?'#94a3b8':'#9ca3af');
+    vis.setAttribute('stroke-width',isSel?'2.5':'1.5');
+    vis.setAttribute('stroke-dasharray',isCross&&!isSel?'5 3':'');
+    vis.setAttribute('marker-end',`url(#${markerId})`);
+    vis.style.opacity=isCross?'0.6':'1';
+    vis.dataset.edgeId=edge.id;
+    targetLayer.appendChild(vis);
 
-    if(bothPass){
-      const lx=(from.x+2*cx+to.x)/4,ly=(from.y+2*cy+to.y)/4;
-      const wrap=document.createElement('div');wrap.className='el-wrap';wrap.style.left=lx+'px';wrap.style.top=ly+'px';wrap.style.pointerEvents='all';wrap.style.zIndex='10';
-      const pill=document.createElement('div');pill.className='el-pill'+(isSel?' sel':'');pill.textContent=txt2.length>24?txt2.slice(0,24)+'…':txt2;
-      wrap.addEventListener('click',e=>{e.stopPropagation();openEdgeModal(edge.id);});
-      wrap.appendChild(pill);ll.appendChild(wrap);
-    }
+    const lx=(from.x+2*cx+to.x)/4,ly=(from.y+2*cy+to.y)/4;
+    const wrap=document.createElement('div');wrap.className='el-wrap';wrap.style.left=lx+'px';wrap.style.top=ly+'px';wrap.style.pointerEvents='all';wrap.style.zIndex='10';
+    wrap.style.opacity=isCross?'0.6':'1';
+    const pill=document.createElement('div');pill.className='el-pill'+(isSel?' sel':'');pill.textContent=txt2.length>24?txt2.slice(0,24)+'…':txt2;
+    wrap.addEventListener('click',e=>{e.stopPropagation();selectEdge(edge.id);});
+    wrap.addEventListener('contextmenu',e=>{e.stopPropagation();openCtxMenu(e,'edge',edge.id);});
+    wrap.appendChild(pill);ll.appendChild(wrap);
+    edge._from=from; edge._to=to; edge._cx=cx; edge._cy=cy;
   });
+  renderEdgeHandles();
 }
 
 // ── Save / Load ───────────────────────────────────────────────────────────────
@@ -3425,7 +3949,7 @@ function loadSnapshot(snap){
   }
   // Restore protocols
   // Restore protocols: start from defaults, add custom ones, strip old defaults that were removed
-  const removedDefaults=['gRPC','GraphQL','WebSocket','Event stream','Other','service','api','db'];
+  const removedDefaults=['gRPC','GraphQL','WebSocket','Event stream','Other','service','api','db','API Call','Database query','appmod','storage'];
   if(s.connectionProtocols) s.connectionProtocols.forEach(p=>{ if(!connectionProtocols.includes(p)&&!removedDefaults.includes(p)) connectionProtocols.push(p); });
   // Restore nodes
   if(s.nodes){
@@ -3437,7 +3961,7 @@ function loadSnapshot(snap){
       if(!n.w)n.w=160; if(!n.h)n.h=120;
       if(!Array.isArray(n.portfolio))n.portfolio=n.portfolio?[n.portfolio]:[];
       if(!Array.isArray(n.techFlags))n.techFlags=[];
-      if(!n.coe1)n.coe1=''; if(!n.coe2)n.coe2='';
+      if(!n.coe1)n.coe1=''; if(!n.coe2)n.coe2=''; if(!n.coe3)n.coe3='';
       if(!n.fontSize)n.fontSize=13;
       nodeCounter=Math.max(nodeCounter,parseInt(n.id.replace('node-',''))||0);
     });
@@ -3941,7 +4465,70 @@ async function spDeleteFile(serverRelativeUrl,label){
   }catch(err){ await dlgAlert('Could not delete: '+err.message,'SharePoint Error'); }
 }
 
-// ── Custom dialogs (replaces prompt/alert/confirm for SharePoint sandbox) ─────
+// ── Context menu (right-click layer ordering) ─────────────────────────────────
+let _ctxTarget=null; // {kind:'node'|'shape'|'edge', id}
+
+function openCtxMenu(e, kind, id){
+  e.preventDefault(); e.stopPropagation();
+  _ctxTarget={kind,id};
+  const m=document.getElementById('ctx-menu');
+  m.style.display='block';
+  m.style.left=Math.min(e.clientX,window.innerWidth-200)+'px';
+  m.style.top=Math.min(e.clientY,window.innerHeight-160)+'px';
+}
+function closeCtxMenu(){document.getElementById('ctx-menu').style.display='none';_ctxTarget=null;}
+
+document.addEventListener('click',()=>closeCtxMenu());
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('#ctx-menu'))closeCtxMenu();});
+
+function ctxAction(action){
+  if(!_ctxTarget){closeCtxMenu();return;}
+  pushUndo();
+  const {kind,id}=_ctxTarget;
+  closeCtxMenu();
+
+  if(kind==='node'){
+    // Nodes: sort by zOrder; default 0
+    const allZ=Object.values(nodes).map(n=>n.zOrder||0);
+    const maxZ=Math.max(...allZ), minZ=Math.min(...allZ);
+    const node=nodes[id]; if(!node)return;
+    const cur=node.zOrder||0;
+    if(action==='front') node.zOrder=maxZ+1;
+    else if(action==='back') node.zOrder=minZ-1;
+    else if(action==='forward') node.zOrder=cur+1;
+    else if(action==='backward') node.zOrder=cur-1;
+    applyNodeZOrders();
+  } else if(kind==='shape'){
+    const allZ=shapes.map(s=>s.zOrder||0);
+    const maxZ=allZ.length?Math.max(...allZ):0, minZ=allZ.length?Math.min(...allZ):0;
+    const shape=shapes.find(s=>s.id===id); if(!shape)return;
+    const cur=shape.zOrder||0;
+    if(action==='front') shape.zOrder=maxZ+1;
+    else if(action==='back') shape.zOrder=minZ-1;
+    else if(action==='forward') shape.zOrder=cur+1;
+    else if(action==='backward') shape.zOrder=cur-1;
+    renderShapes();
+  } else if(kind==='edge'){
+    const allZ=edges.map(ed=>ed.zOrder||0);
+    const maxZ=allZ.length?Math.max(...allZ):0, minZ=allZ.length?Math.min(...allZ):0;
+    const edge=edges.find(ed=>ed.id===id); if(!edge)return;
+    const cur=edge.zOrder||0;
+    if(action==='front'){ edge.zOrder=maxZ+1; edge._forceTop=true; }
+    else if(action==='back'){ edge.zOrder=minZ-1; edge._forceTop=false; }
+    else if(action==='forward'){ edge.zOrder=cur+1; edge._forceTop=true; }
+    else if(action==='backward'){ edge.zOrder=cur-1; edge._forceTop=false; }
+    redrawEdges();
+  }
+}
+
+function applyNodeZOrders(){
+  // Sort nodes by zOrder and apply z-index to DOM elements
+  const sorted=Object.values(nodes).sort((a,b)=>(a.zOrder||0)-(b.zOrder||0));
+  sorted.forEach((n,i)=>{
+    const el=document.getElementById(n.id);
+    if(el) el.style.zIndex=String(i+1);
+  });
+}
 let _dlgResolve=null;
 function dlgResolve(val){
   document.getElementById('dlg-modal').style.display='none';
