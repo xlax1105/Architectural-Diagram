@@ -80,7 +80,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 #edges-layer{pointer-events:none}
 #edges-layer path.hit-path{pointer-events:all}
 #canvas{position:absolute;top:0;left:0;transform-origin:0 0;width:4000px;height:4000px;z-index:3;pointer-events:none}
-#draw-layer{position:absolute;top:0;left:0;width:4000px;height:4000px;pointer-events:none;z-index:3;transform-origin:0 0}
+#draw-layer{position:absolute;top:0;left:0;width:4000px;height:4000px;pointer-events:none;z-index:6;transform-origin:0 0}
 #draw-layer.drawing{pointer-events:all;cursor:crosshair}
 #connect-overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:none;cursor:crosshair;z-index:5}
 #connect-overlay.active{display:block}
@@ -130,6 +130,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .cshape svg{display:block}
 .cshape-del{position:absolute;top:-10px;right:-10px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font-size:11px;border:none;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:10;line-height:1}
 .cshape.selected .cshape-del{display:flex}
+.cshape.selected .shape-toolbar{display:flex!important}
+.cshape.selected .shape-color-btn{display:block!important}
 .shape-rh{position:absolute;width:10px;height:10px;background:#fff;border:2px solid var(--ac);border-radius:2px;z-index:11;display:none}
 .cshape.selected .shape-rh{display:block}
 .shape-rh.nw{top:-5px;left:-5px;cursor:nw-resize}
@@ -325,11 +327,6 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
 <div id="toolbar">
   <h1>⬡ ArchFlow</h1>
   <div class="tbsep"></div>
-  <button class="tbbtn" id="btn-connect" onclick="toggleConnectMode()">
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 8h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    Connect
-  </button>
-  <div class="tbsep"></div>
   <button class="tbbtn" id="btn-draw-rect" onclick="setDrawMode('rect')" title="Draw rectangle">▭ Rect</button>
   <button class="tbbtn" id="btn-draw-ellipse" onclick="setDrawMode('ellipse')" title="Draw ellipse">◯ Ellipse</button>
   <button class="tbbtn" id="btn-draw-sticky" onclick="setDrawMode('sticky')" title="Add sticky note">🗒 Sticky</button>
@@ -344,13 +341,20 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
   <button class="tbbtn" id="btn-edges-top" onclick="toggleEdgesOnTop()" title="Show all connection arrows above nodes">↑ Connections</button>
   <div class="tbsep"></div>
   <div style="position:relative">
+    <button class="tbbtn" id="btn-layer" onclick="openLayerMenu(event)" title="Layer ordering for selected object">⧉ Layer ▾</button>
+    <div id="layer-menu" style="position:fixed;display:none;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:3000;min-width:170px;overflow:hidden">
+      <div class="save-menu-item" onclick="layerAction('front')">⬆ Bring to Front</div>
+      <div class="save-menu-item" onclick="layerAction('forward')">↑ Bring Forward</div>
+      <div class="save-menu-item" onclick="layerAction('backward')">↓ Send Backward</div>
+      <div class="save-menu-item" onclick="layerAction('back')">⬇ Send to Back</div>
+    </div>
+  </div>
+  <div class="tbsep"></div>
+  <div style="position:relative">
     <button class="tbbtn" onclick="openSaveMenu(event)" title="Save / Load">💾 Save ▾</button>
     <div id="save-menu" style="position:fixed;display:none;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.14);z-index:3000;min-width:190px;overflow:hidden">
       <div class="save-menu-item" onclick="saveToSlot()">💾 Save (auto-slot)</div>
       <div class="save-menu-item" onclick="openSlotsModal()">📂 Manage saved diagrams</div>
-      <div class="save-menu-sep"></div>
-      <div class="save-menu-item" onclick="spSaveDiagram()">☁ Save to SharePoint</div>
-      <div class="save-menu-item" onclick="spOpenBrowser()">📂 Load from SharePoint</div>
       <div class="save-menu-sep"></div>
       <div class="save-menu-item" onclick="exportJSON()">⬇ Export as JSON file</div>
       <div class="save-menu-item" onclick="document.getElementById('import-file-input').click()">⬆ Import from JSON file</div>
@@ -392,9 +396,8 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
 
   <div id="canvas-wrap">
     <svg id="canvas-bg" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid-pat" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#d0ced0" stroke-width="0.75"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid-pat)"/></svg>
-    <svg id="portfolio-overlay" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:3;pointer-events:none"></svg>
-    <div id="shapes-layer" style="position:absolute;top:0;left:0;width:4000px;height:4000px;transform-origin:0 0;z-index:2"></div>
-    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg">
+    <svg id="portfolio-overlay" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:1;pointer-events:none"></svg>
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:2;pointer-events:none">
       <defs>
         <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#9ca3af"/></marker>
         <marker id="ah-sel" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto"><polygon points="0 0,8 3.5,0 7" fill="#5B4CF5"/></marker>
@@ -402,8 +405,10 @@ body:has(#conn-popup.visible) #filter-bar{margin-right:340px}
       </defs>
       <g id="edges-layer"></g>
     </svg>
-    <div id="canvas">
-      <div id="edge-labels-layer" style="position:absolute;top:0;left:0;pointer-events:none;width:4000px;height:4000px"></div>
+    <!-- canvas: shapes + nodes share this stacking context so z-order works across both -->
+    <div id="canvas" style="position:absolute;top:0;left:0;transform-origin:0 0;width:4000px;height:4000px;z-index:3;pointer-events:none">
+      <div id="shapes-layer" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:all"></div>
+      <div id="edge-labels-layer" style="position:absolute;top:0;left:0;pointer-events:none;width:4000px;height:4000px;z-index:50"></div>
     </div>
     <!-- Top edge layer: edges between overlapping nodes render above all nodes -->
     <svg id="svg-layer-top" xmlns="http://www.w3.org/2000/svg" style="position:absolute;top:0;left:0;width:4000px;height:4000px;overflow:visible;transform-origin:0 0;z-index:4;pointer-events:none">
@@ -796,9 +801,8 @@ function init(){
   },{passive:false});
   // draw layer events
   const dl=document.getElementById('draw-layer');
-  dl.addEventListener('mousedown',onDrawStart);
-  dl.addEventListener('mousemove',onDrawMove);
-  dl.addEventListener('mouseup',onDrawEnd);
+  // Draw events handled via canvas-wrap mousedown/mousemove/mouseup
+  // (draw-layer just renders the preview SVG, events come from canvas-wrap)
   document.addEventListener('click',e=>{
     closeAllFbDropdowns();
     if(!e.target.closest('#proto-custom-dropdown')&&!e.target.closest('#em-proto')&&!e.target.closest('[onclick*="toggleProtoDropdown"]'))closeProtoDropdown();
@@ -1149,9 +1153,8 @@ function applyCanvasTransform(){
   document.getElementById('svg-layer').style.transform=t;
   document.getElementById('svg-layer-top').style.transform=t;
   document.getElementById('draw-layer').style.transform=t;
-  document.getElementById('shapes-layer').style.transform=t;
-  document.getElementById('edge-handles').style.transform=t;
   document.getElementById('portfolio-overlay').style.transform=t;
+  document.getElementById('edge-handles').style.transform=t;
   // Scale grid dots with zoom
   const gs=GRID*scale;
   document.getElementById('canvas-bg').querySelector('pattern').setAttribute('width',gs);
@@ -1407,6 +1410,7 @@ function startGroupDrag(e){
 }
 
 function onMouseMove(e){
+  if(drawStart&&drawPreview&&drawMode){onDrawMove(e);return;}
   // ── Edge handle drag — must be first ──
   if(draggingEdgeHandle){
     const p=clientToCanvas(e.clientX,e.clientY);
@@ -1615,6 +1619,7 @@ function onMouseMove(e){
   }
 }
 function onMouseUp(e){
+  if(drawStart){onDrawEnd(e);return;}
   if(draggingEdgeHandle){draggingEdgeHandle=null;document.body.style.cursor='';pushUndo();}
   if(resizing){resizing=null;document.body.style.cursor='';pushUndo();}
   if(resizingShape){
@@ -1652,11 +1657,8 @@ function onMouseUp(e){
 
 // ── Select ────────────────────────────────────────────────────────────────────
 function selectNode(id){
-  const prev=selNode;
-  // Clear any multi-sel
-  selNodes.clear();
-  document.querySelectorAll('.node.multi-sel').forEach(n=>n.classList.remove('multi-sel'));
-  if(prev){document.getElementById(prev)?.classList.remove('selected');syncResizeHandles(prev);}
+  // Clear everything first — shapes, texts, multi-sel
+  clearSelection();
   selNode=id;
   if(id){
     document.getElementById(id)?.classList.add('selected');
@@ -1681,7 +1683,7 @@ function clearSelection(){
     exitTextEdit(inner,t);
   });
   if(selNode){syncResizeHandles(selNode);}
-  selNode=null;selShape=null;
+  selNode=null; selShape=null;
 }
 
 function onCanvasMouseDown(e){
@@ -1698,6 +1700,22 @@ function onCanvasMouseDown(e){
 
   // Edge handle clicks are handled in capture phase — don't pan
   if(e.target.classList.contains('edge-handle'))return;
+
+  // Deselect everything if clicking outside shapes/nodes
+  if(!e.target.closest('.cshape,.node,.ctextblock')){
+    clearSelection();
+  } else if(!e.target.closest('.cshape')&&selShape){
+    // Clicked a node/text but not a shape — deselect shape
+    const el=document.querySelector(`.cshape[data-id="${selShape}"]`);
+    if(el) el.classList.remove('selected');
+    selShape=null;
+  }
+
+  // Draw mode: handle anywhere on canvas-wrap
+  if(drawMode&&!e.target.closest('.node,.cshape,.ctextblock,.ibtn,.port,.resize-handle,.edge-handle')){
+    onDrawStart(e);
+    return;
+  }
 
   // In lasso mode: always intercept and start rubber-band (capture phase ensures this fires first)
   if(lassoMode&&!e.target.closest('.ibtn,.port,.cshape-del,.ctextblock-del,.resize-handle,.shape-rh')){
@@ -1723,11 +1741,19 @@ function onCanvasMouseDown(e){
   }
 
   // If the click landed on an interactive element, let it handle itself
-  const interactive=e.target.closest('.node,.cshape,.ctextblock,.ibtn,.port,.resize-handle,.el-wrap,.fb-dropdown,.ms-dropdown,.modal,.tbbtn,#zoom-controls,#connect-hint,#empty-state,#conn-popup,#save-menu,#slots-modal,#edge-modal,#type-modal,#import-choice-modal,#edge-pill-hover,#proto-custom-dropdown,.shape-rh,.cshape-del,.ctextblock-del,.ctextblock-toolbar,#focus-chips,#edge-toolbar');
-  if(interactive)return;
+  const interactive=e.target.closest('.node,.ctextblock,.ibtn,.port,.resize-handle,.el-wrap,.fb-dropdown,.ms-dropdown,.modal,.tbbtn,#zoom-controls,#connect-hint,#empty-state,#conn-popup,#save-menu,#slots-modal,#edge-modal,#type-modal,#import-choice-modal,#edge-pill-hover,#proto-custom-dropdown,.shape-rh,.cshape-del,.ctextblock-del,.ctextblock-toolbar,#focus-chips,#edge-toolbar,.shape-lock-badge');
+  // Check if clicking a shape — only treat as interactive if unlocked
+  const shapeEl=!interactive&&e.target.closest('.cshape');
+  const shapeId=shapeEl?.dataset?.id;
+  const shapeObj=shapeId&&shapes.find(s=>s.id===shapeId);
+  const interactiveShape=shapeEl&&shapeObj&&!shapeObj.locked;
+  if(interactive||interactiveShape) return;
 
   if(connectMode){ exitConnectMode(); return; }
   if(e.target.closest&&e.target.closest('#svg-layer')&&e.target.tagName==='path') return;
+
+  // Clicking empty canvas — clear everything
+  clearSelection(); hideProps();
 
   if(!drawMode){
     // Plain left-drag = pan
@@ -1921,20 +1947,22 @@ function setDrawMode(mode){
   drawMode=mode;
   ['rect','ellipse','arrow','text','sticky'].forEach(m=>document.getElementById('btn-draw-'+m)?.classList.remove('active'));
   document.getElementById('btn-draw-'+mode)?.classList.add('active');
-  const dl=document.getElementById('draw-layer');
+  document.getElementById('shapes-layer').style.pointerEvents='none';
+  // Make canvas-wrap capture draw events via its existing mousemove/mousedown
+  const cw=document.getElementById('canvas-wrap');
+  cw.style.cursor='crosshair';
   if(mode==='text'||mode==='sticky'){
-    dl.style.pointerEvents='all';dl.style.cursor='crosshair';
     document.getElementById('mode-label').textContent=mode==='sticky'?'Click on canvas to place sticky note':'Click on canvas to place text';
   } else {
-    dl.style.pointerEvents='all';dl.style.cursor='crosshair';
     document.getElementById('mode-label').textContent=`Draw ${mode} — click and drag`;
   }
 }
 function clearDrawMode(){
-  drawMode=null;drawStart=null;drawPreview=null;
+  drawMode=null;drawStart=null;
+  if(drawPreview){document.getElementById('draw-layer').removeChild(drawPreview);drawPreview=null;}
   ['rect','ellipse','arrow','text','sticky'].forEach(m=>document.getElementById('btn-draw-'+m)?.classList.remove('active'));
-  const dl=document.getElementById('draw-layer');
-  dl.style.pointerEvents='none';dl.style.cursor='default';
+  document.getElementById('canvas-wrap').style.cursor='grab';
+  document.getElementById('shapes-layer').style.pointerEvents='all';
   document.getElementById('mode-label').textContent='Select mode';
 }
 function canvasPos(e){ return clientToCanvas(e.clientX,e.clientY); }
@@ -1948,58 +1976,43 @@ function onDrawStart(e){
   if(drawMode==='sticky'){
     placeSticky(p.x,p.y);clearDrawMode();return;
   }
-  drawStart=p;
-  // create preview element
-  const svg=document.getElementById('draw-layer');
-  if(drawPreview){svg.removeChild(drawPreview);drawPreview=null;}
-  const ns='http://www.w3.org/2000/svg';
-  if(drawMode==='rect'){
-    drawPreview=document.createElementNS(ns,'rect');
-    drawPreview.setAttribute('fill','rgba(91,76,245,.08)');
-    drawPreview.setAttribute('stroke','#5B4CF5');drawPreview.setAttribute('stroke-width','1.5');
-    drawPreview.setAttribute('rx','4');drawPreview.setAttribute('stroke-dasharray','5 3');
-  } else if(drawMode==='ellipse'){
-    drawPreview=document.createElementNS(ns,'ellipse');
-    drawPreview.setAttribute('fill','rgba(91,76,245,.08)');
-    drawPreview.setAttribute('stroke','#5B4CF5');drawPreview.setAttribute('stroke-width','1.5');
-    drawPreview.setAttribute('stroke-dasharray','5 3');
-  } else if(drawMode==='arrow'){
-    drawPreview=document.createElementNS(ns,'line');
-    drawPreview.setAttribute('stroke','#374151');drawPreview.setAttribute('stroke-width','2');
-    drawPreview.setAttribute('marker-end','url(#ah-draw)');
-  }
-  if(drawPreview)svg.appendChild(drawPreview);
+  drawStart={canvas:p, screen:{x:e.clientX,y:e.clientY}};
+  // Create screen-space ghost preview div
+  if(drawPreview) drawPreview.remove();
+  drawPreview=document.createElement('div');
+  drawPreview.style.cssText=`position:fixed;pointer-events:none;z-index:9999;border:1.5px dashed #5B4CF5;background:rgba(91,76,245,.07);box-sizing:border-box;${drawMode==='ellipse'?'border-radius:50%':'border-radius:4px'}`;
+  drawPreview.style.left=e.clientX+'px';
+  drawPreview.style.top=e.clientY+'px';
+  drawPreview.style.width='0';
+  drawPreview.style.height='0';
+  document.body.appendChild(drawPreview);
 }
 function onDrawMove(e){
   if(!drawStart||!drawPreview)return;
-  const p=canvasPos(e);
-  const x1=drawStart.x, y1=drawStart.y, x2=p.x, y2=p.y;
-  if(drawMode==='rect'){
-    drawPreview.setAttribute('x',Math.min(x1,x2));drawPreview.setAttribute('y',Math.min(y1,y2));
-    drawPreview.setAttribute('width',Math.abs(x2-x1));drawPreview.setAttribute('height',Math.abs(y2-y1));
-  } else if(drawMode==='ellipse'){
-    drawPreview.setAttribute('cx',(x1+x2)/2);drawPreview.setAttribute('cy',(y1+y2)/2);
-    drawPreview.setAttribute('rx',Math.abs(x2-x1)/2);drawPreview.setAttribute('ry',Math.abs(y2-y1)/2);
-  } else if(drawMode==='arrow'){
-    drawPreview.setAttribute('x1',x1);drawPreview.setAttribute('y1',y1);
-    drawPreview.setAttribute('x2',x2);drawPreview.setAttribute('y2',y2);
-  }
+  const sx=drawStart.screen.x, sy=drawStart.screen.y;
+  const cx=e.clientX, cy=e.clientY;
+  drawPreview.style.left=Math.min(sx,cx)+'px';
+  drawPreview.style.top=Math.min(sy,cy)+'px';
+  drawPreview.style.width=Math.abs(cx-sx)+'px';
+  drawPreview.style.height=Math.abs(cy-sy)+'px';
 }
 function onDrawEnd(e){
   if(!drawStart)return;
   const p=canvasPos(e);
-  const dx=Math.abs(p.x-drawStart.x),dy=Math.abs(p.y-drawStart.y);
+  if(drawPreview){drawPreview.remove();drawPreview=null;}
+  const s0=drawStart.canvas||drawStart;
+  const dx=Math.abs(p.x-s0.x),dy=Math.abs(p.y-s0.y);
+  drawStart=null;
   if(dx>4||dy>4){
     const id='shape-'+(++shapeCounter);
-    const s={id,kind:drawMode,x:Math.min(drawStart.x,p.x),y:Math.min(drawStart.y,p.y),
-             w:Math.abs(p.x-drawStart.x),h:Math.abs(p.y-drawStart.y),
-             x1:drawStart.x,y1:drawStart.y,x2:p.x,y2:p.y};
+    const s={id,kind:drawMode,x:Math.min(s0.x,p.x),y:Math.min(s0.y,p.y),
+             w:Math.abs(p.x-s0.x),h:Math.abs(p.y-s0.y),
+             x1:s0.x,y1:s0.y,x2:p.x,y2:p.y};
     pushUndo();
-    shapes.push(s);renderShapes();
+    shapes.push(s);
+    renderShapes();
     document.getElementById('empty-state').style.display='none';
   }
-  if(drawPreview){document.getElementById('draw-layer').removeChild(drawPreview);drawPreview=null;}
-  drawStart=null;
   clearDrawMode();
 }
 function placeText(x,y){
@@ -2048,7 +2061,105 @@ function renderShapes(){
     if(!el){
       el=document.createElement('div');el.className='cshape';el.dataset.id=s.id;
 
-      // Delete button
+      // Shape toolbar (appears above shape when selected)
+      const toolbar=document.createElement('div');
+      toolbar.className='shape-toolbar';
+      toolbar.style.cssText='position:absolute;top:-38px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--bd2);border-radius:8px;padding:5px 9px;box-shadow:0 2px 12px rgba(0,0,0,.15);z-index:20;white-space:nowrap';
+      toolbar.addEventListener('mousedown',e=>e.stopPropagation());
+
+      // Color picker
+      const colorLabel=document.createElement('label');
+      colorLabel.style.cssText='display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:var(--tx2)';
+      colorLabel.textContent='🎨';
+      const colorInput=document.createElement('input');
+      colorInput.type='color';colorInput.value=s.fillColor||'#e0e7ff';
+      colorInput.style.cssText='width:22px;height:22px;border:none;border-radius:4px;cursor:pointer;padding:0;background:none';
+      colorInput.addEventListener('input',()=>{s.fillColor=colorInput.value;renderShapes();});
+      colorLabel.appendChild(colorInput);
+      toolbar.appendChild(colorLabel);
+
+      // Separator
+      const sep=document.createElement('div');
+      sep.style.cssText='width:1px;height:18px;background:var(--bd);flex-shrink:0';
+      toolbar.appendChild(sep);
+
+      // Opacity slider
+      const opLabel=document.createElement('span');
+      opLabel.style.cssText='font-size:11px;color:var(--tx2)';
+      opLabel.textContent='Opacity:';
+      toolbar.appendChild(opLabel);
+      const opSlider=document.createElement('input');
+      opSlider.type='range';opSlider.min='10';opSlider.max='100';opSlider.step='5';
+      opSlider.value=Math.round((s.opacity??1)*100);
+      opSlider.style.cssText='width:70px;cursor:pointer;accent-color:var(--ac)';
+      const opVal=document.createElement('span');
+      opVal.style.cssText='font-size:11px;color:var(--tx2);min-width:30px';
+      opVal.textContent=opSlider.value+'%';
+      opSlider.addEventListener('input',()=>{
+        s.opacity=parseInt(opSlider.value)/100;
+        opVal.textContent=opSlider.value+'%';
+        renderShapes();
+      });
+      toolbar.appendChild(opSlider);
+      toolbar.appendChild(opVal);
+
+      // Separator
+      const sep2=document.createElement('div');
+      sep2.style.cssText='width:1px;height:18px;background:var(--bd);flex-shrink:0';
+      toolbar.appendChild(sep2);
+
+      // Outline-only toggle
+      const outlineBtn=document.createElement('button');
+      outlineBtn.title='Toggle outline only (no fill)';
+      outlineBtn.style.cssText='border:1px solid var(--bd2);background:var(--surface);cursor:pointer;font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;color:var(--tx2);white-space:nowrap';
+      outlineBtn.textContent=s.outlineOnly?'◼ Fill':'◻ Outline';
+      outlineBtn.addEventListener('click',e=>{
+        e.stopPropagation();
+        s.outlineOnly=!s.outlineOnly;
+        outlineBtn.textContent=s.outlineOnly?'◼ Fill':'◻ Outline';
+        renderShapes();
+      });
+      toolbar.appendChild(outlineBtn);
+
+      // Separator
+      const sep3=document.createElement('div');
+      sep3.style.cssText='width:1px;height:18px;background:var(--bd);flex-shrink:0';
+      toolbar.appendChild(sep3);
+
+      // Lock button
+      const lockBtn=document.createElement('button');
+      lockBtn.className='shape-lock-btn';
+      lockBtn.title='Lock/unlock position';
+      lockBtn.style.cssText='border:1px solid var(--bd2);background:var(--surface);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:5px;color:var(--tx2)';
+      lockBtn.textContent=s.locked?'🔒':'🔓';
+      lockBtn.addEventListener('click',e=>{
+        e.stopPropagation();
+        s.locked=!s.locked;
+        lockBtn.textContent=s.locked?'🔒':'🔓';
+        el.style.cursor=s.locked?'grab':'move';
+        const badge=el.querySelector('.shape-lock-badge');
+        if(badge) badge.style.display=s.locked?'flex':'none';
+      });
+      toolbar.appendChild(lockBtn);
+
+      const tbDel=document.createElement('button');
+      tbDel.textContent='🗑';tbDel.title='Delete shape';
+      tbDel.style.cssText='border:none;background:none;cursor:pointer;font-size:13px;padding:1px 3px;color:var(--red);border-radius:4px';
+      tbDel.addEventListener('click',e=>{e.stopPropagation();deleteShape(s.id);});
+      toolbar.appendChild(tbDel);
+
+      el.appendChild(toolbar);
+
+      // Unlock badge — always clickable even when shape is locked (pointer-events set directly)
+      const lockBadge=document.createElement('div');
+      lockBadge.className='shape-lock-badge';
+      lockBadge.title='Double-click shape to unlock';
+      lockBadge.style.cssText='position:absolute;top:4px;right:4px;display:none;align-items:center;justify-content:center;background:#fff;border:1.5px solid var(--bd2);border-radius:6px;padding:2px 5px;font-size:10px;cursor:default;z-index:20;box-shadow:0 1px 4px rgba(0,0,0,.15);pointer-events:none;color:var(--tx3)';
+      lockBadge.textContent='🔒 Dbl-click to unlock';
+      lockBadge.addEventListener('mousedown',e=>{e.stopPropagation();});
+      el.appendChild(lockBadge);
+
+      // Keep old del button for CSS-driven display
       const delBtn=document.createElement('button');
       delBtn.className='cshape-del';delBtn.title='Delete shape';delBtn.textContent='×';
       delBtn.addEventListener('click',e=>{e.stopPropagation();deleteShape(s.id);});
@@ -2060,6 +2171,7 @@ function renderShapes(){
         const rh=document.createElement('div');
         rh.className='shape-rh '+corner;
         rh.addEventListener('mousedown',e=>{
+          if(s.locked) return;
           e.stopPropagation();e.preventDefault();
           pushUndo();
           const p=clientToCanvas(e.clientX,e.clientY);
@@ -2070,6 +2182,8 @@ function renderShapes(){
       });
 
       el.addEventListener('mousedown',e=>{
+        if(e.target.closest('.shape-lock-badge')) return; // badge handles its own click
+        if(s.locked) return; // locked — let canvas handle for panning
         if(e.target===delBtn)return;
         // In lasso mode: pass through if NOT selected (start rubber-band)
         // But if selected, allow dragging the selection
@@ -2083,25 +2197,70 @@ function renderShapes(){
         const selShapes=document.querySelectorAll('.cshape.selected,.ctextblock.selected');
         const hasGroup=selNodes.size>0||(el.classList.contains('selected')&&selShapes.length>1);
         if(hasGroup&&el.classList.contains('selected')){
-          startGroupDrag(e);
+          if(!s.locked) startGroupDrag(e);
         } else {
           clearSelection();
+          selShape=s.id;
           el.classList.add('selected');
-          startShapeDrag(e,s.id,'shape');
+          if(!s.locked) startShapeDrag(e,s.id,'shape');
         }
       });
+
+      // Double-click to unlock a locked shape
+      el.addEventListener('dblclick',e=>{
+        if(!s.locked)return;
+        e.stopPropagation();
+        s.locked=false;
+        el.style.cursor='move';
+        const badge=el.querySelector('.shape-lock-badge');
+        if(badge) badge.style.display='none';
+        const lb=el.querySelector('.shape-lock-btn');
+        if(lb) lb.textContent='🔓';
+        showSaveToast('Shape unlocked');
+      });
+
       sl.appendChild(el);
     }
     // shapes-layer is now inside #canvas, so use raw canvas coords
     el.style.left=s.x+'px'; el.style.top=s.y+'px';
     el.style.width=s.w+'px'; el.style.height=s.h+'px';
+    el.style.opacity=s.opacity!==undefined?s.opacity:1;
+    el.style.cursor=s.locked?'grab':'move';
+    el.style.pointerEvents='all'; // always all - lock handled via mousedown return
+    // Sync lock button
+    const lockBtn=el.querySelector('.shape-lock-btn');
+    if(lockBtn) lockBtn.textContent=s.locked?'🔒':'🔓';
+    const lockBadge=el.querySelector('.shape-lock-badge');
+    if(lockBadge){ lockBadge.style.display=s.locked?'flex':'none'; lockBadge.style.pointerEvents='all'; }
+    if(s.outlineOnly){
+      el.querySelectorAll('.shape-rh,.cshape-del,.shape-toolbar').forEach(c=>c.style.pointerEvents='all');
+    } else {
+      el.querySelectorAll('.shape-rh,.cshape-del,.shape-toolbar').forEach(c=>c.style.pointerEvents='');
+    }
+    // Sync toolbar inputs
+    const colorInput=el.querySelector('input[type="color"]');
+    if(colorInput) colorInput.value=s.fillColor||'#e0e7ff';
+    const opSlider=el.querySelector('input[type="range"]');
+    const opVal=el.querySelector('.shape-toolbar span:last-of-type');
+    if(opSlider){const v=Math.round((s.opacity??1)*100);opSlider.value=v;if(opVal)opVal.textContent=v+'%';}
+    // Sync color picker (legacy)
+    const colorBtn=el.querySelector('.shape-color-btn');
+    if(colorBtn) colorBtn.value=s.fillColor||'#e0e7ff';
+    // Sync outline toggle button text
+    const outlineBtn=el.querySelector('.shape-toolbar button[title="Toggle outline only (no fill)"]');
+    if(outlineBtn) outlineBtn.textContent=s.outlineOnly?'◼ Fill':'◻ Outline';
+
+    const fill=s.outlineOnly?'none':(s.fillColor||'rgba(91,76,245,.06)');
+    const pEvents=s.outlineOnly?'visibleStroke':'all';
+    const strokeW=s.outlineOnly?'8':'1.5'; // thicker invisible hit area for outline-only
+    const strokeDisplay=s.outlineOnly?'3':'1.5'; // visual stroke width
     const ns='http://www.w3.org/2000/svg';
     let inner='';
     if(s.kind==='rect'){
-      inner=`<svg width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}" xmlns="${ns}"><rect x="1" y="1" width="${s.w-2}" height="${s.h-2}" rx="4" fill="rgba(91,76,245,.06)" stroke="#6b7280" stroke-width="1.5"/></svg>`;
+      inner=`<svg width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}" xmlns="${ns}" pointer-events="${pEvents}" style="position:absolute;top:0;left:0;pointer-events:${pEvents}"><rect x="1" y="1" width="${s.w-2}" height="${s.h-2}" rx="4" fill="${fill}" stroke="#6b7280" stroke-width="${strokeDisplay}" pointer-events="${pEvents}"/></svg>`;
     } else if(s.kind==='ellipse'){
       const rw=s.w/2,rh=s.h/2;
-      inner=`<svg width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}" xmlns="${ns}"><ellipse cx="${rw}" cy="${rh}" rx="${rw-1}" ry="${rh-1}" fill="rgba(91,76,245,.06)" stroke="#6b7280" stroke-width="1.5"/></svg>`;
+      inner=`<svg width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}" xmlns="${ns}" pointer-events="${pEvents}" style="position:absolute;top:0;left:0;pointer-events:${pEvents}"><ellipse cx="${rw}" cy="${rh}" rx="${rw-1}" ry="${rh-1}" fill="${fill}" stroke="#6b7280" stroke-width="${strokeDisplay}" pointer-events="${pEvents}"/></svg>`;
     } else if(s.kind==='arrow'){
       const dx=s.x2-s.x1,dy=s.y2-s.y1;
       inner=`<svg width="${s.w+20}" height="${s.h+20}" style="overflow:visible" xmlns="${ns}">
@@ -2138,9 +2297,23 @@ function renderShapes(){
         if(body&&document.activeElement!==body) body.innerText=s.content||'';
       }
     } else {
-      let ring=el.querySelector('.shape-sel-ring');
-      if(!ring){ring=document.createElement('div');ring.className='shape-sel-ring';ring.style.cssText='width:100%;height:100%;position:relative';el.appendChild(ring);}
       ring.innerHTML=inner;
+      // For outline-only: attach drag listener to the SVG stroke (after innerHTML is set)
+      if(s.outlineOnly){
+        const svgEl=ring.querySelector('svg');
+        if(svgEl){
+          svgEl.style.cursor='move';
+          svgEl.addEventListener('mousedown',e=>{
+            e.stopPropagation();
+            clearSelection();selShape=s.id;
+            el.classList.add('selected');
+            const p=clientToCanvas(e.clientX,e.clientY);
+            dragging={kind:'shape',id:s.id};
+            dragOffX=p.x-s.x; dragOffY=p.y-s.y;
+            pushUndo();
+          });
+        }
+      }
     }
   });
 }
@@ -2177,7 +2350,7 @@ function renderTexts(){
       const fsVal=document.createElement('span');fsVal.className='fs-val';fsVal.textContent=(t.fontSize||14)+'px';
       const fsUp=document.createElement('button');fsUp.textContent='A+';fsUp.title='Increase font size';
       fsDown.addEventListener('mousedown',e=>{e.stopPropagation();e.preventDefault();t.fontSize=Math.max(8,(t.fontSize||14)-2);fsVal.textContent=t.fontSize+'px';inner.style.fontSize=t.fontSize+'px';});
-      fsUp.addEventListener('mousedown',e=>{e.stopPropagation();e.preventDefault();t.fontSize=Math.min(72,(t.fontSize||14)+2);fsVal.textContent=t.fontSize+'px';inner.style.fontSize=t.fontSize+'px';});
+      fsUp.addEventListener('mousedown',e=>{e.stopPropagation();e.preventDefault();t.fontSize=Math.min(300,(t.fontSize||14)+2);fsVal.textContent=t.fontSize+'px';inner.style.fontSize=t.fontSize+'px';});
       toolbar.appendChild(fsDown);toolbar.appendChild(fsVal);toolbar.appendChild(fsUp);
       el.appendChild(toolbar);
       el.appendChild(inner);
@@ -2185,8 +2358,22 @@ function renderTexts(){
       // Single click: select (not edit)
       el.addEventListener('mousedown',e=>{
         if(e.target===delBtn)return;
-        if(e.target.classList.contains('sticky-note-body'))return; // let body handle its own clicks
-        // In lasso mode: pass through if NOT selected (start rubber-band)
+        if(e.target.classList.contains('sticky-note-body'))return;
+        if(s.outlineOnly){
+          const svgEl=el.querySelector('svg');
+          const shapeEl=svgEl&&(svgEl.querySelector('rect')||svgEl.querySelector('ellipse'));
+          if(shapeEl){
+            const pt=svgEl.createSVGPoint();
+            const rect=svgEl.getBoundingClientRect();
+            pt.x=(e.clientX-rect.left)/rect.width*s.w;
+            pt.y=(e.clientY-rect.top)/rect.height*s.h;
+            const origSW=shapeEl.getAttribute('stroke-width');
+            shapeEl.setAttribute('stroke-width','12');
+            const onStroke=shapeEl.isPointInStroke(pt);
+            shapeEl.setAttribute('stroke-width',origSW);
+            if(!onStroke) return;
+          }
+        }
         if(lassoMode&&!el.classList.contains('selected'))return;
         e.stopPropagation();
         if(inner.classList.contains('editing'))return;
@@ -2405,7 +2592,7 @@ function redrawEdges(){
     const _curve=_dist<80?0:Math.min(30,_dist*.1),_nx=-_dy/_dist,_ny=_dx/_dist;
     const _cx=edge.cpX!==undefined?edge.cpX:((fromPt.x+toPt.x)/2)+_nx*_curve;
     const _cy=edge.cpY!==undefined?edge.cpY:((fromPt.y+toPt.y)/2)+_ny*_curve;
-    const useTopLayer=edgesOnTop||edge._forceTop||nodesOverlap(nFrom,nTo)||edgePassesOverAnyNode(fromPt,toPt,_cx,_cy,edge.from,edge.to);
+    const useTopLayer=!edge._forceBehind&&(edgesOnTop||edge._forceTop||nodesOverlap(nFrom,nTo)||edgePassesOverAnyNode(fromPt,toPt,_cx,_cy,edge.from,edge.to));
     const targetLayer=useTopLayer?layerTop:layer;
     const markerId=useTopLayer?(isSel?'ah-top-sel':'ah-top'):(isSel?'ah-sel':'ah');
 
@@ -2823,6 +3010,11 @@ function onKeyDown(e){
   if(e.key==='Escape'){
     if(_mergePreview){cancelMergePreview();return;}
     if(selEdge&&!editEdgeId){clearEdgeSelection();return;}
+    if(selShape){
+      const el=document.querySelector(`.cshape[data-id="${selShape}"]`);
+      if(el) el.classList.remove('selected');
+      selShape=null; return;
+    }
     if(lassoMode){toggleLasso();return;}
     if(viewMode){toggleViewMode();return;}
     exitConnectMode();closeEdgeModal();closeConnPopup();clearDrawMode();clearSelection();hideProps();
@@ -3876,8 +4068,8 @@ function redrawEdgesFiltered(passing, dimmed){
       d=`M${from.x},${from.y} Q${cx},${cy} ${to.x},${to.y}`;
     }
 
-    const useTopLayer=edgesOnTop||edge._forceTop||nodesOverlap(nFrom,nTo)||
-      (nFrom&&nTo&&edgePassesOverAnyNode(from,to,cx,cy,edge.from,edge.to));
+    const useTopLayer=!edge._forceBehind&&(edgesOnTop||edge._forceTop||nodesOverlap(nFrom,nTo)||
+      (nFrom&&nTo&&edgePassesOverAnyNode(from,to,cx,cy,edge.from,edge.to)));
     const targetLayer=useTopLayer?layerTop:layer;
     const markerId=useTopLayer?(isSel?'ah-top-sel':'ah-top'):(isSel?'ah-sel':'ah');
 
@@ -4209,29 +4401,43 @@ function onMergePreviewClick(e){
   cw.removeEventListener('mousemove',onMergePreviewMove);
   document.getElementById('connect-hint').style.display='none';
 
-  const {ghostIds,pendingEdges,pendingSh,pendingTx}=_mergePreview;
+  const {ghostIds,pendingEdges,pendingSh,pendingTx,importMinX,importMinY}=_mergePreview;
 
-  // Finalise ghost nodes — remove ghost styling
+  // Compute final placement offset from click position
+  const p=clientToCanvas(e.clientX,e.clientY);
+  const ax=snapPt(p.x), ay=snapPt(p.y);
+  const dx=ax-importMinX, dy=ay-importMinY;
+
+  // Finalize ghost node positions at exact drop point
+  const srcNodes=Array.isArray(_mergePreview.snap.state.nodes)?_mergePreview.snap.state.nodes:Object.values(_mergePreview.snap.state.nodes||{});
+  ghostIds.forEach(id=>{
+    const n=nodes[id];if(!n)return;
+    const orig=srcNodes.find(sn=>_mergePreview.nodeIdMap[sn.id]===id);
+    if(!orig)return;
+    n.x=ax+(orig.x-importMinX);
+    n.y=ay+(orig.y-importMinY);
+    const el=document.getElementById(id);
+    if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';}
+  });
+
+  // Remove ghost styling
   ghostIds.forEach(id=>{
     const el=document.getElementById(id);
     if(el){ el.style.opacity=''; el.style.outline=''; el.style.pointerEvents=''; }
     renderNode(nodes[id],true);
   });
 
-  // Place edges
-  pendingEdges.forEach(edge=>{ edges.push({...edge,id:'edge-'+(++edgeCounter)}); });
-
-  // Place shapes and texts, offset to match where nodes landed
-  // Compute final offset from first ghost node vs original
-  const firstGhostId=ghostIds[0];
-  const firstNode=nodes[firstGhostId];
-  const origNodes=Array.isArray(_mergePreview.snap.state.nodes)?_mergePreview.snap.state.nodes:Object.values(_mergePreview.snap.state.nodes||{});
-  const firstOrig=origNodes.find(n=>_mergePreview.nodeIdMap[n.id]===firstGhostId);
-  const dx=firstNode&&firstOrig?firstNode.x-firstOrig.x:0;
-  const dy=firstNode&&firstOrig?firstNode.y-firstOrig.y:0;
+  // Place edges — remap IDs and offset custom endpoint/control point overrides
+  pendingEdges.forEach(edge=>{
+    const e={...edge, id:'edge-'+(++edgeCounter)};
+    if(e.fromPtX!==undefined){ e.fromPtX+=dx; e.fromPtY+=dy; }
+    if(e.toPtX!==undefined){ e.toPtX+=dx; e.toPtY+=dy; }
+    if(e.cpX!==undefined){ e.cpX+=dx; e.cpY+=dy; }
+    edges.push(e);
+  });
 
   pendingSh.forEach(sh=>{
-    shapes.push({...sh,x:sh._srcX+dx,y:sh._srcY+dy,x1:(sh._srcX1||sh._srcX)+dx,y1:(sh._srcY1||sh._srcY)+dy,x2:(sh._srcX2||sh._srcX)+dx,y2:(sh._srcY2||sh._srcY)+dy});
+    shapes.push({...sh,x:sh._srcX+dx,y:sh._srcY+dy});
   });
   pendingTx.forEach(t=>{ texts.push({...t,x:t._srcX+dx,y:t._srcY+dy}); });
 
@@ -4269,6 +4475,7 @@ function openSaveMenu(e){
   }
 }
 function closeSaveMenu(){ document.getElementById('save-menu').style.display='none'; }
+function closeAllMenus(){ closeSaveMenu(); document.getElementById('layer-menu').style.display='none'; }
 
 // ── Toast notification ────────────────────────────────────────────────────────
 function showSaveToast(msg){
@@ -4465,6 +4672,30 @@ async function spDeleteFile(serverRelativeUrl,label){
   }catch(err){ await dlgAlert('Could not delete: '+err.message,'SharePoint Error'); }
 }
 
+function openLayerMenu(e){
+  e.stopPropagation();
+  const m=document.getElementById('layer-menu');
+  const isOpen=m.style.display==='block';
+  closeAllMenus();
+  if(isOpen)return;
+  const r=e.currentTarget.getBoundingClientRect();
+  m.style.left=r.left+'px';
+  m.style.top=(r.bottom+4)+'px';
+  m.style.display='block';
+}
+
+function layerAction(action){
+  document.getElementById('layer-menu').style.display='none';
+  let kind=null, id=null;
+  if(selEdge){ kind='edge'; id=selEdge; }
+  else if(selNode){ kind='node'; id=selNode; }
+  else if(selShape){ kind='shape'; id=selShape; }
+  else if(selNodes&&selNodes.size>0){ kind='node'; id=[...selNodes][0]; }
+  if(!kind||!id){ showSaveToast('Select a node, shape, or arrow first'); return; }
+  ctxAction(action, kind, id);
+  showSaveToast({front:'⬆ Brought to Front',back:'⬇ Sent to Back',forward:'↑ Brought Forward',backward:'↓ Sent Backward'}[action]||'Layer updated');
+}
+
 // ── Context menu (right-click layer ordering) ─────────────────────────────────
 let _ctxTarget=null; // {kind:'node'|'shape'|'edge', id}
 
@@ -4479,54 +4710,111 @@ function openCtxMenu(e, kind, id){
 function closeCtxMenu(){document.getElementById('ctx-menu').style.display='none';_ctxTarget=null;}
 
 document.addEventListener('click',()=>closeCtxMenu());
+document.addEventListener('click',()=>closeAllMenus());
 document.addEventListener('contextmenu',e=>{if(!e.target.closest('#ctx-menu'))closeCtxMenu();});
 
-function ctxAction(action){
-  if(!_ctxTarget){closeCtxMenu();return;}
-  pushUndo();
-  const {kind,id}=_ctxTarget;
+function ctxAction(action, kindOverride, idOverride){
+  const kind=kindOverride||(_ctxTarget&&_ctxTarget.kind);
+  const id=idOverride||(_ctxTarget&&_ctxTarget.id);
   closeCtxMenu();
+  if(!kind||!id)return;
+  pushUndo();
+
+  const boundsOf=(k,i)=>{
+    if(k==='node'){const n=nodes[i];return n?{x:n.x,y:n.y,w:n.w||160,h:n.h||120}:null;}
+    if(k==='shape'){const s=shapes.find(s=>s.id===i);return s?{x:s.x,y:s.y,w:s.w||160,h:s.h||120}:null;}
+    if(k==='edge'){
+      const e=edges.find(e=>e.id===i);
+      if(!e||!e._from||!e._to)return null;
+      const minX=Math.min(e._from.x,e._to.x,e._cx||0)-20;
+      const minY=Math.min(e._from.y,e._to.y,e._cy||0)-20;
+      const maxX=Math.max(e._from.x,e._to.x,e._cx||0)+20;
+      const maxY=Math.max(e._from.y,e._to.y,e._cy||0)+20;
+      return{x:minX,y:minY,w:maxX-minX,h:maxY-minY};
+    }
+    return null;
+  };
+  const overlap=(b1,b2)=>{
+    if(!b1||!b2)return false;
+    return b1.x<b2.x+b2.w&&b1.x+b1.w>b2.x&&b1.y<b2.y+b2.h&&b1.y+b1.h>b2.y;
+  };
+  const isAbove=(k,i)=>{
+    // Is this item currently visually above nodes?
+    if(k==='node') return true; // nodes always above svg-layer by default
+    if(k==='shape') return false; // shapes always behind
+    if(k==='edge'){const e=edges.find(e=>e.id===i);return e&&(e._forceTop||!e._forceBehind);}
+    return false;
+  };
+
+  const myBounds=boundsOf(kind,id);
+  if(!myBounds)return;
 
   if(kind==='node'){
-    // Nodes: sort by zOrder; default 0
-    const allZ=Object.values(nodes).map(n=>n.zOrder||0);
-    const maxZ=Math.max(...allZ), minZ=Math.min(...allZ);
-    const node=nodes[id]; if(!node)return;
-    const cur=node.zOrder||0;
-    if(action==='front') node.zOrder=maxZ+1;
-    else if(action==='back') node.zOrder=minZ-1;
-    else if(action==='forward') node.zOrder=cur+1;
-    else if(action==='backward') node.zOrder=cur-1;
-    applyNodeZOrders();
+    // Find overlapping edges; toggle their _forceBehind/_forceTop
+    const overlappingEdges=edges.filter(e=>{
+      const eb=boundsOf('edge',e.id);return overlap(myBounds,eb);
+    });
+    if(overlappingEdges.length===0){showSaveToast('No overlapping arrows found');return;}
+    if(action==='forward'||action==='front'){
+      // Node comes in front: force all overlapping edges behind
+      overlappingEdges.forEach(e=>{e._forceTop=false;e._forceBehind=true;});
+    } else {
+      // Node goes behind: force all overlapping edges to top
+      overlappingEdges.forEach(e=>{e._forceTop=true;e._forceBehind=false;});
+    }
+    redrawEdges();
+
   } else if(kind==='shape'){
-    const allZ=shapes.map(s=>s.zOrder||0);
-    const maxZ=allZ.length?Math.max(...allZ):0, minZ=allZ.length?Math.min(...allZ):0;
-    const shape=shapes.find(s=>s.id===id); if(!shape)return;
-    const cur=shape.zOrder||0;
-    if(action==='front') shape.zOrder=maxZ+1;
-    else if(action==='back') shape.zOrder=minZ-1;
-    else if(action==='forward') shape.zOrder=cur+1;
-    else if(action==='backward') shape.zOrder=cur-1;
-    renderShapes();
+    // Shapes are always in the back — just reorder among themselves
+    const overlappingShapes=shapes.filter(s=>{
+      if(s.id===id)return false;
+      return overlap(myBounds,boundsOf('shape',s.id));
+    });
+    const setZ=(sid,z)=>{const s=shapes.find(s=>s.id===sid);if(s)s.zOrder=z;};
+    const getZ=(sid)=>shapes.find(s=>s.id===sid)?.zOrder||0;
+    const curZ=getZ(id);
+    if(overlappingShapes.length===0){
+      setZ(id,action==='forward'||action==='front'?curZ+1:curZ-1);
+    } else {
+      overlappingShapes.sort((a,b)=>(a.zOrder||0)-(b.zOrder||0));
+      if(action==='forward'||action==='front'){
+        const above=overlappingShapes.filter(s=>(s.zOrder||0)>curZ);
+        if(above.length){const t=above[0];setZ(id,t.zOrder||0);setZ(t.id,curZ);}
+        else setZ(id,curZ+1);
+      } else {
+        const below=overlappingShapes.filter(s=>(s.zOrder||0)<curZ);
+        if(below.length){const t=below[below.length-1];setZ(id,t.zOrder||0);setZ(t.id,curZ);}
+        else setZ(id,curZ-1);
+      }
+    }
+    applyShapeZOrders();
+
   } else if(kind==='edge'){
-    const allZ=edges.map(ed=>ed.zOrder||0);
-    const maxZ=allZ.length?Math.max(...allZ):0, minZ=allZ.length?Math.min(...allZ):0;
-    const edge=edges.find(ed=>ed.id===id); if(!edge)return;
-    const cur=edge.zOrder||0;
-    if(action==='front'){ edge.zOrder=maxZ+1; edge._forceTop=true; }
-    else if(action==='back'){ edge.zOrder=minZ-1; edge._forceTop=false; }
-    else if(action==='forward'){ edge.zOrder=cur+1; edge._forceTop=true; }
-    else if(action==='backward'){ edge.zOrder=cur-1; edge._forceTop=false; }
+    const edge=edges.find(e=>e.id===id);if(!edge)return;
+    if(action==='forward'||action==='front'){
+      edge._forceTop=true;edge._forceBehind=false;
+    } else {
+      edge._forceTop=false;edge._forceBehind=true;
+    }
     redrawEdges();
   }
 }
 
 function applyNodeZOrders(){
-  // Sort nodes by zOrder and apply z-index to DOM elements
   const sorted=Object.values(nodes).sort((a,b)=>(a.zOrder||0)-(b.zOrder||0));
   sorted.forEach((n,i)=>{
     const el=document.getElementById(n.id);
     if(el) el.style.zIndex=String(i+1);
+  });
+}
+
+function applyShapeZOrders(){
+  const sl=document.getElementById('shapes-layer');
+  // Sort existing shape elements by zOrder
+  const sorted=[...shapes].sort((a,b)=>(a.zOrder||0)-(b.zOrder||0));
+  sorted.forEach((s,i)=>{
+    const el=sl.querySelector(`.cshape[data-id="${s.id}"]`);
+    if(el){ el.style.zIndex=String(i+1); sl.appendChild(el); } // re-append in order
   });
 }
 let _dlgResolve=null;
